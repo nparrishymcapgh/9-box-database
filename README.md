@@ -76,3 +76,9 @@ SMTP is optional now because there is no approval email workflow.
 pip install -r requirements.txt
 streamlit run streamlit_app.py
 ```
+
+## Migration note for existing data
+
+- Older rows in the `Responses` tab may include legacy approval-related columns (`employee_*`, `executive_*`, token fields, and prior status values).
+- The current manager-only app ignores those legacy workflow fields and only uses manager submission data.
+- You can keep historical rows as-is; no data migration is required for the app to run.
