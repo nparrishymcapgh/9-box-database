@@ -150,24 +150,22 @@ This tab contains all manager 9-box questions. Required columns (case-sensitive)
 | Column | Type | Required | Description |
 |--------|------|----------|-------------|
 | `ID` | Number/Text | Yes | Unique question identifier |
-| `question` | Text | Yes | The question text shown to managers |
 | `points` | Number | Yes | Points to add when the manager answers Yes |
-| `role` | Text | No | Employee role/job title this question applies to; blank means all roles |
-| `question_section` | Text | No | Group questions by section (optional) |
-| `header` | Text | No | Section header text (optional) |
+| `question` | Text | Yes | The question text shown to managers |
+| `role` | Text | Yes | Employee role/job title this question applies to |
 
 Role matching notes:
 - The app matches each employee using Employees.role or Employees.job_title.
 - A role cell can contain multiple role names separated by commas.
-- If role is blank, the question applies to every employee.
+- If role is blank, the question applies to every employee (supported, but optional by your process).
 
 **Example:**
 ```
-ID | question | points | role | question_section | header
-1  | Consistently meets branch goals | 1 | Membership Director | Performance | Performance Indicators
-2  | Mentors team members proactively | 2 | Membership Director | Leadership | Leadership Behaviors
-3  | Builds cross-team partnerships | 1 | Membership Director, Program Director | Collaboration | Teamwork Behaviors
-4  | Demonstrates YMCA values daily | 1 |  | Values | Core Values
+ID | points | question | role
+1  | 1      | Consistently meets branch goals       | Membership Director
+2  | 2      | Mentors team members proactively      | Membership Director
+3  | 1      | Builds cross-team partnerships        | Membership Director, Program Director
+4  | 1      | Demonstrates YMCA values daily        | 
 ```
 
 #### **Employee_Questions Tab**
