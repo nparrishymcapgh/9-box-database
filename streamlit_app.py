@@ -537,15 +537,15 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         """
         <style>
         .ninebox-layout {
-            --ninebox-text: var(--text-color, #111827);
-            --ninebox-axis-text: var(--text-color, #111827);
+            --ninebox-text: currentColor;
+            --ninebox-axis-text: currentColor;
             --ninebox-bg: var(--background-color, #ffffff);
             --ninebox-border: color-mix(in srgb, var(--ninebox-text) 28%, transparent);
             --ninebox-soft-border: color-mix(in srgb, var(--ninebox-text) 18%, transparent);
             --ninebox-muted: color-mix(in srgb, var(--ninebox-text) 76%, transparent);
             --ninebox-empty: color-mix(in srgb, var(--ninebox-text) 52%, transparent);
             --ninebox-cell-bg: color-mix(in srgb, var(--ninebox-bg) 94%, var(--ninebox-text) 6%);
-            color: var(--ninebox-text);
+            color: inherit;
             display: grid;
             grid-template-columns: 92px minmax(0, 1fr);
             gap: 0;
@@ -556,7 +556,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             display: flex;
             align-items: center;
             justify-content: center;
-            color: var(--ninebox-axis-text);
+            color: inherit;
             min-height: 560px;
             padding-bottom: 0;
         }
@@ -569,13 +569,13 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             white-space: pre;
         }
         .ninebox-axis-label-row {
-            color: var(--ninebox-axis-text);
+            color: currentColor;
             font-size: 1.05rem;
             font-weight: 700;
             text-shadow: 0 0 0.01px currentColor;
         }
         .ninebox-axis-text {
-            color: var(--ninebox-axis-text) !important;
+            color: currentColor !important;
         }
         .ninebox-main {
             display: flex;
@@ -655,7 +655,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             align-items: center;
-            color: var(--ninebox-axis-text);
+            color: inherit;
             font-size: 1.05rem;
             gap: 0.65rem;
             min-width: 720px;
