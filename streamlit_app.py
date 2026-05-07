@@ -68,7 +68,7 @@ def load_sheet(tab_name):
     spreadsheet = get_spreadsheet()
     try:
         worksheet = spreadsheet.worksheet(tab_name)
-        return pd.DataFrame(worksheet.get_all_records())
+        return read_worksheet_dataframe(worksheet)
     except gspread.exceptions.WorksheetNotFound:
         return pd.DataFrame()
 
@@ -89,6 +89,38 @@ def ensure_dataframe_columns(df, expected_columns):
         if col not in df.columns:
             df[col] = ""
     return df
+
+
+def make_unique_headers(headers):
+    normalized_headers = []
+    seen_counts = {}
+
+    for index, header in enumerate(headers, start=1):
+        base_header = normalize_text(header) or f"column_{index}"
+        count = seen_counts.get(base_header, 0)
+        seen_counts[base_header] = count + 1
+        normalized_headers.append(base_header if count == 0 else f"{base_header}_{count + 1}")
+
+    return normalized_headers
+
+
+def read_worksheet_dataframe(worksheet):
+    values = worksheet.get_all_values()
+    if not values:
+        return pd.DataFrame()
+
+    headers = make_unique_headers(values[0])
+    data_rows = []
+    expected_len = len(headers)
+
+    for raw_row in values[1:]:
+        row = list(raw_row[:expected_len])
+        if len(row) < expected_len:
+            row.extend([""] * (expected_len - len(row)))
+        if any(normalize_text(cell) for cell in row):
+            data_rows.append(row)
+
+    return pd.DataFrame(data_rows, columns=headers)
 
 
 def column_letter(index):
@@ -114,7 +146,7 @@ def ensure_sheet_headers(worksheet, headers):
 def load_responses():
     spreadsheet = get_spreadsheet()
     worksheet = ensure_responses_sheet(spreadsheet)
-    df = pd.DataFrame(worksheet.get_all_records())
+    df = read_worksheet_dataframe(worksheet)
     return ensure_dataframe_columns(df, MANAGER_RESPONSE_COLUMNS)
 
 
