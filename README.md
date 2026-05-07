@@ -1,4 +1,4 @@
-# 9 Box Evaluation
+# Succession Planning
 
 This Streamlit app supports manager-only 9 box evaluations backed by Google Sheets.
 
@@ -94,8 +94,9 @@ streamlit run streamlit_app.py
 ## UI behavior
 
 - Individual question point values are not shown on the main evaluation screen.
-- The app shows the calculated 9 box score, level name, performance, and potential while answers are selected.
+- The main evaluation screen shows only the level name, performance, and potential while answers are selected.
 - Total points are shown at the bottom of the evaluation screen.
+- Submitted 9 Box Evaluations shows each employee with their full level details, including focus, steps, and description.
 
 ## Migration note for existing data
 

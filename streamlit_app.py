@@ -13,7 +13,7 @@ from google.oauth2.service_account import Credentials
 # PAGE CONFIG
 # ============================================================================
 st.set_page_config(
-    page_title="9 Box Evaluation",
+    page_title="Succession Planning",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -252,6 +252,13 @@ def get_level_details(levels_df, score):
     return matches.iloc[0]
 
 
+def score_to_9box_rating(total_points):
+    try:
+        return max(1, min(9, int(float(total_points))))
+    except (TypeError, ValueError):
+        return None
+
+
 def calculate_9box_metrics(answers, question_rows, base_points=8):
     points_lookup = {
         str(row.get("ID", "")).strip(): parse_question_points(row.get("points", 0))
@@ -364,7 +371,7 @@ def sync_session_data():
 # ============================================================================
 # APP UI
 # ============================================================================
-st.title("9 Box Evaluation")
+st.title("Succession Planning")
 
 if "gcp_service_account" not in st.secrets:
     st.error("Google service account credentials not configured.")
@@ -441,10 +448,10 @@ if manager_employees.empty:
     st.warning("No employees are assigned to this manager email in the Employees sheet.")
     st.stop()
 
-tab_submit, tab_status, tab_levels = st.tabs(["9 Box Evaluation", "Submitted Ratings", "Levels"])
+tab_submit, tab_status = st.tabs(["Succession Planning", "Submitted 9 Box Evaluations"])
 
 with tab_submit:
-    st.markdown("### Complete a 9 Box Evaluation")
+    st.markdown("### Complete Succession Planning")
 
     selected_employee_id = st.selectbox(
         "Select employee",
@@ -477,8 +484,7 @@ with tab_submit:
     total_points, yes_count, no_count, nine_box_rating = calculate_9box_metrics(answers, scoped_questions)
     level_details = get_level_details(st.session_state.get("levels_df", pd.DataFrame()), nine_box_rating)
 
-    score_col, name_col, performance_col, potential_col = st.columns(4)
-    score_col.metric("9 Box Score", f"{nine_box_rating}")
+    name_col, performance_col, potential_col = st.columns(3)
     name_col.metric("Level", level_details.get("name", "") if level_details is not None else "")
     performance_col.metric(
         "Performance",
@@ -488,14 +494,6 @@ with tab_submit:
         "Potential",
         level_details.get("potential", "") if level_details is not None else "",
     )
-
-    if level_details is not None:
-        if level_details.get("description", ""):
-            st.caption(level_details.get("description", ""))
-        if level_details.get("focus", ""):
-            st.write(f"Focus: {level_details.get('focus', '')}")
-        if level_details.get("steps", ""):
-            st.write(f"Steps: {level_details.get('steps', '')}")
 
     comments = st.text_area("Manager comments (optional)", height=120)
 
@@ -513,11 +511,11 @@ with tab_submit:
         )
         append_response(entry)
         clear_data_caches()
-        st.success("9 Box Evaluation submitted.")
+        st.success("Succession Planning submitted.")
         st.rerun()
 
 with tab_status:
-    st.markdown("### Your submitted ratings")
+    st.markdown("### Submitted 9 Box Evaluations")
     mine = responses_df[
         responses_df["manager_email"].astype(str).str.strip().str.lower() == manager_email
     ].copy()
@@ -526,9 +524,27 @@ with tab_status:
         st.info("No ratings submitted yet.")
     else:
         mine = mine.sort_values("created_at", ascending=False)
+        mine["9 Box Score"] = mine["questions_score"].apply(score_to_9box_rating)
+
+        levels_df = st.session_state.get("levels_df", pd.DataFrame())
+        if not levels_df.empty:
+            level_details = levels_df.rename(
+                columns={
+                    "score": "9 Box Score",
+                    "name": "Level",
+                    "performance": "Performance",
+                    "potential": "Potential",
+                    "focus": "Focus",
+                    "steps": "Steps",
+                    "description": "Description",
+                }
+            )
+            mine = mine.merge(level_details, on="9 Box Score", how="left")
+
         display_cols = [
             "employee_name", "employee_id", "branch", "dept", "job_title",
-            "questions_score", "status", "created_at", "updated_at",
+            "questions_score", "9 Box Score", "Level", "Performance", "Potential",
+            "Focus", "Steps", "Description", "comments", "status", "created_at", "updated_at",
         ]
         available = [c for c in display_cols if c in mine.columns]
         df = mine[available].rename(
@@ -539,20 +555,10 @@ with tab_status:
                 "dept": "Dept",
                 "job_title": "Role",
                 "questions_score": "Total Points",
+                "comments": "Manager Comments",
                 "status": "Status",
                 "created_at": "Created",
                 "updated_at": "Updated",
             }
         )
         st.dataframe(df, use_container_width=True, hide_index=True)
-
-with tab_levels:
-    st.markdown("### Levels")
-    levels_df = st.session_state.get("levels_df", pd.DataFrame())
-
-    if levels_df.empty:
-        st.info(
-            "No Levels data found. Add a Levels sheet with columns: score, performance, potential, name, steps, focus, description."
-        )
-    else:
-        st.dataframe(levels_df, use_container_width=True, hide_index=True)

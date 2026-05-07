@@ -1,9 +1,10 @@
 # Unreleased
 
-- Renamed the manager workflow UI to 9 Box Evaluation.
+- Restored the manager workflow title to Succession Planning.
 - Changed 9-box scoring to start from 8 points and removed the visible base-score caption.
 - Removed per-question point labels and yes-no count summaries from the manager evaluation screen.
-- Added Levels sheet support and a Levels tab, and surfaced the matching level name, performance, and potential during score calculation.
+- Added Levels sheet support and surfaced the matching level name, performance, and potential during score calculation.
+- Moved full level details to Submitted 9 Box Evaluations and removed the standalone Levels tab.
 
 # Changelog
 
