@@ -690,49 +690,53 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         <script>
         (function () {
             /*
-             * Streamlit uses Emotion CSS-in-JS to apply theme changes.
-             * It injects/swaps <style> tags — NOT DOM attributes.
-             * MutationObserver with attributeFilter never fires on theme switch.
-             * Solution: poll on a short interval to read the real computed
-             * body background and update cells accordingly.
+             * Streamlit uses Emotion CSS-in-JS.
+             * Body background stays transparent; dark bg is on .stApp via generated classes.
+             * Most reliable signal: computed TEXT color on .stApp.
+             * In dark mode Streamlit sets light text (luminance > 0.5).
+             * In light mode it sets dark text (luminance < 0.5).
              */
 
-            /* Cancel any previously running interval from a prior script injection */
             if (window.__nineboxIntervalId) {
                 clearInterval(window.__nineboxIntervalId);
             }
 
             function getLuminance(rgbString) {
                 var m = (rgbString || '').match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
-                if (!m) { return 1; }
+                if (!m) { return 0; }
                 return (0.299 * +m[1] + 0.587 * +m[2] + 0.114 * +m[3]) / 255;
             }
 
-            function getBodyBackground() {
-                /* Streamlit writes the page background onto document.body */
-                var els = [document.body, document.documentElement];
-                for (var i = 0; i < els.length; i++) {
-                    var bg = window.getComputedStyle(els[i]).backgroundColor;
-                    if (bg && bg !== 'transparent' && bg !== 'rgba(0, 0, 0, 0)') {
-                        return bg;
+            function getAppTextColor() {
+                var candidates = [
+                    document.querySelector('.stApp'),
+                    document.querySelector('[data-testid="stAppViewContainer"]'),
+                    document.querySelector('[data-testid="stMainBlockContainer"]'),
+                    document.body
+                ];
+                for (var i = 0; i < candidates.length; i++) {
+                    var el = candidates[i];
+                    if (!el) { continue; }
+                    var c = window.getComputedStyle(el).color || '';
+                    if (c && c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent') {
+                        return c;
                     }
                 }
-                return 'rgb(255,255,255)';
+                return 'rgb(0,0,0)';
             }
 
-            var _lastBg = null;
+            var _lastTextColor = null;
 
             function applyTheme() {
-                var bg = getBodyBackground();
-                /* Skip if nothing changed — avoids unnecessary DOM writes */
-                if (bg === _lastBg) { return; }
-                _lastBg = bg;
+                var textColor = getAppTextColor();
+                if (textColor === _lastTextColor) { return; }
+                _lastTextColor = textColor;
 
-                var isDark = getLuminance(bg) < 0.5;
+                /* Light text → dark mode; dark text → light mode */
+                var isDark = getLuminance(textColor) > 0.5;
                 var cellBg = isDark ? '#000000' : '#ffffff';
 
-                var layouts = document.querySelectorAll('.ninebox-layout');
-                layouts.forEach(function (layout) {
+                document.querySelectorAll('.ninebox-layout').forEach(function (layout) {
                     layout.style.setProperty('--ninebox-cell-bg', cellBg);
                     layout.querySelectorAll('.ninebox-cell').forEach(function (cell) {
                         cell.style.setProperty('background-color', cellBg, 'important');
@@ -740,7 +744,6 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
                 });
             }
 
-            /* Run immediately, then poll every 400 ms */
             applyTheme();
             window.__nineboxIntervalId = setInterval(applyTheme, 400);
         })();
