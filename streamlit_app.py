@@ -28,6 +28,7 @@ QUESTIONS_TAB = "Questions"
 RESPONSES_TAB = "Responses"
 MANAGERS_TAB = "Managers"
 LEVELS_TAB = "Levels"
+RESOURCE_TABS = ["Resource", "Resources"]
 DEFAULT_DATA_SYNC_MINUTES = 5
 
 # Keep legacy response columns for compatibility with existing sheet data.
@@ -70,6 +71,14 @@ def load_sheet(tab_name):
         return pd.DataFrame(worksheet.get_all_records())
     except gspread.exceptions.WorksheetNotFound:
         return pd.DataFrame()
+
+
+def load_first_available_sheet(tab_names):
+    for tab_name in tab_names:
+        df = load_sheet(tab_name)
+        if not df.empty:
+            return df
+    return pd.DataFrame()
 
 
 def ensure_dataframe_columns(df, expected_columns):
@@ -260,6 +269,35 @@ def prepare_levels(levels_df):
     return normalized.reset_index(drop=True)
 
 
+def prepare_resources(resources_df):
+    expected_columns = [
+        "score",
+        "resource_1_name",
+        "resource_1_link",
+        "resource_2_name",
+        "resource_2_link",
+        "resource_3_name",
+        "resource_3_link",
+    ]
+    if resources_df.empty:
+        return pd.DataFrame(columns=expected_columns)
+
+    score_column = get_first_matching_column(resources_df, ["score", "rating", "level", "9_box_rating", "nine_box_rating"])
+    if not score_column:
+        return pd.DataFrame(columns=expected_columns)
+
+    normalized = pd.DataFrame()
+    normalized["score"] = resources_df[score_column].apply(parse_level_score)
+    for column in expected_columns[1:]:
+        source_column = get_first_matching_column(resources_df, [column])
+        normalized[column] = resources_df[source_column].astype(str).str.strip() if source_column else ""
+
+    normalized = normalized.dropna(subset=["score"])
+    normalized["score"] = normalized["score"].astype(int)
+    normalized = normalized.drop_duplicates(subset=["score"], keep="first")
+    return normalized.reset_index(drop=True)
+
+
 def get_level_details(levels_df, score):
     if levels_df.empty:
         return None
@@ -268,6 +306,28 @@ def get_level_details(levels_df, score):
     if matches.empty:
         return None
     return matches.iloc[0]
+
+
+def get_resources_for_score(resources_df, score):
+    if resources_df.empty or score is None:
+        return []
+
+    matches = resources_df[resources_df["score"] == int(score)]
+    if matches.empty:
+        return []
+
+    row = matches.iloc[0]
+    resources = []
+    for index in range(1, 4):
+        name = normalize_text(row.get(f"resource_{index}_name", ""))
+        link = normalize_text(row.get(f"resource_{index}_link", ""))
+        if name and link:
+            resources.append({"name": name, "link": link})
+    return resources
+
+
+def get_employee_role(employee_row):
+    return normalize_text(employee_row.get("role", employee_row.get("job_title", "")))
 
 
 def score_to_9box_rating(total_points):
@@ -319,34 +379,49 @@ def render_level_summary(level_details, score_label, score_value):
     )
 
 
-def render_saved_evaluation_details(saved_row, levels_df, question_rows=None):
+def render_resources(resources):
+    if not resources:
+        return
+
+    st.markdown("**Resources**")
+    for resource in resources:
+        st.markdown(f"- [{resource['name']}]({resource['link']})")
+
+
+def render_saved_evaluation_details(saved_row, levels_df, resources_df, question_rows=None):
     saved_total_points = parse_question_points(saved_row.get("questions_score", 0))
     saved_score = score_to_9box_rating(saved_total_points)
     level_details = get_level_details(levels_df, saved_score) if saved_score is not None else None
+    resources = get_resources_for_score(resources_df, saved_score)
 
     render_level_summary(level_details, "Score", saved_score or "")
     st.caption(f"Saved: {saved_row.get('created_at', '')}")
 
     if normalize_text(saved_row.get("comments", "")):
-        st.write(f"Manager comments: {saved_row.get('comments', '')}")
+        st.markdown(f"**Manager comments:** {saved_row.get('comments', '')}")
 
     if level_details is not None:
-        if normalize_text(level_details.get("focus", "")):
-            st.write(f"Focus: {level_details.get('focus', '')}")
-        if normalize_text(level_details.get("steps", "")):
-            st.write(f"Steps: {level_details.get('steps', '')}")
         if normalize_text(level_details.get("description", "")):
-            st.write(f"Description: {level_details.get('description', '')}")
+            st.markdown(f"**Description:** {level_details.get('description', '')}")
+        if normalize_text(level_details.get("focus", "")):
+            st.markdown(f"**Focus:** {level_details.get('focus', '')}")
+        if normalize_text(level_details.get("steps", "")):
+            st.markdown(f"**Steps:** {level_details.get('steps', '')}")
+
+    render_resources(resources)
 
     if question_rows is not None and not question_rows.empty:
         saved_answers = parse_saved_answers(saved_row.get("responses", ""))
         if saved_answers:
-            st.write("Responses")
-            for _, question in question_rows.iterrows():
-                question_id = str(question.get("ID", "")).strip()
-                prompt = str(question.get("question", "")).strip()
-                answer = saved_answers.get(question_id, "")
-                st.write(f"{prompt}: {answer}")
+            with st.expander("Questions and responses", expanded=False):
+                for _, question in question_rows.iterrows():
+                    question_id = str(question.get("ID", "")).strip()
+                    prompt = str(question.get("question", "")).strip()
+                    answer = saved_answers.get(question_id, "")
+                    st.markdown(
+                        f"<div style='font-size:0.9rem; margin-bottom:0.35rem;'><strong>{prompt}</strong><br>{answer}</div>",
+                        unsafe_allow_html=True,
+                    )
 
 
 def calculate_9box_metrics(answers, question_rows, base_points=8):
@@ -405,6 +480,7 @@ def validate_manager_credentials(managers_df, email, password):
 def create_response_entry(manager_email, manager_name, employee, answers, comments, metrics):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     total_points, _, no_count, _ = metrics
+    employee_role = get_employee_role(employee)
     return {
         "response_id": str(uuid.uuid4()),
         "created_at": now,
@@ -416,7 +492,7 @@ def create_response_entry(manager_email, manager_name, employee, answers, commen
         "employee_email": str(employee.get("email", "")),
         "branch": str(employee.get("branch", "")),
         "dept": str(employee.get("dept", "")),
-        "job_title": str(employee.get("job_title", "")),
+        "job_title": employee_role,
         "executive_email": "",
         "questions_score": total_points,
         "number_of_nos": no_count,
@@ -453,6 +529,7 @@ def sync_session_data():
     st.session_state.questions_df = load_sheet(QUESTIONS_TAB)
     st.session_state.managers_df = load_sheet(MANAGERS_TAB)
     st.session_state.levels_df = prepare_levels(load_sheet(LEVELS_TAB))
+    st.session_state.resources_df = prepare_resources(load_first_available_sheet(RESOURCE_TABS))
     st.session_state.responses_df = load_responses()
     st.session_state.data_loaded = True
     st.session_state.last_data_sync_ts = time.time()
@@ -560,11 +637,12 @@ with tab_submit:
     st.markdown("### Complete 9 Box Evaluation")
 
     levels_df = st.session_state.get("levels_df", pd.DataFrame())
+    resources_df = st.session_state.get("resources_df", pd.DataFrame())
     for _, employee in manager_employees.sort_values("name").iterrows():
         employee_id = str(employee.get("ID", "")).strip()
         employee_name = str(employee.get("name", "")).strip()
-        employee_role = str(employee.get("job_title", "")).strip()
-        expander_label = f"{employee_name} - Role: {employee_role} ({employee_id})"
+        employee_role = get_employee_role(employee)
+        expander_label = f"{employee_name} - Role: {employee_role}"
 
         with st.expander(expander_label):
             st.write(f"Employee: {employee_name} | Role: {employee_role}")
@@ -585,7 +663,7 @@ with tab_submit:
 
             if existing_evaluation is not None:
                 st.info("This employee already has a saved evaluation.")
-                render_saved_evaluation_details(existing_evaluation, levels_df, scoped_questions)
+                render_saved_evaluation_details(existing_evaluation, levels_df, resources_df, scoped_questions)
                 if st.button("Delete and redo evaluation", key=f"delete_{employee_id}"):
                     deleted = delete_response(existing_evaluation.get("response_id", ""))
                     clear_data_caches()
@@ -650,12 +728,13 @@ with tab_status:
     else:
         mine = mine.sort_values("created_at", ascending=False)
         levels_df = st.session_state.get("levels_df", pd.DataFrame())
+        resources_df = st.session_state.get("resources_df", pd.DataFrame())
 
         for _, saved_row in mine.iterrows():
             employee_name = str(saved_row.get("employee_name", "")).strip()
-            employee_role = str(saved_row.get("job_title", "")).strip()
+            employee_role = normalize_text(saved_row.get("job_title", ""))
             employee_id = str(saved_row.get("employee_id", "")).strip()
-            label = f"{employee_name} - Role: {employee_role} ({employee_id})"
+            label = f"{employee_name} - Role: {employee_role}"
 
             employee_row = manager_employees[manager_employees["ID"].astype(str) == employee_id]
             question_rows = pd.DataFrame()
@@ -663,4 +742,4 @@ with tab_status:
                 question_rows = prepare_9box_questions(st.session_state.questions_df, employee_row.iloc[0])
 
             with st.expander(label):
-                render_saved_evaluation_details(saved_row, levels_df, question_rows)
+                render_saved_evaluation_details(saved_row, levels_df, resources_df, question_rows)
