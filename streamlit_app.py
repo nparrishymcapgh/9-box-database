@@ -551,11 +551,11 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         }
         .ninebox-y-axis {
             display: flex;
-            align-items: flex-end;
+            align-items: center;
             justify-content: center;
             color: var(--ninebox-text);
             min-height: 560px;
-            padding-bottom: 0.35rem;
+            padding-bottom: 0;
         }
         .ninebox-y-axis-rotated {
             width: auto;
