@@ -448,23 +448,24 @@ if manager_employees.empty:
     st.warning("No employees are assigned to this manager email in the Employees sheet.")
     st.stop()
 
-tab_submit, tab_status = st.tabs(["Succession Planning", "Submitted 9 Box Evaluations"])
+tab_submit, tab_status = st.tabs(["9 Box Evaluation", "Submitted 9 Box Evaluations"])
 
 with tab_submit:
-    st.markdown("### Complete Succession Planning")
+    st.markdown("### Complete 9 Box Evaluation")
 
     selected_employee_id = st.selectbox(
         "Select employee",
         manager_employees["ID"].astype(str).tolist(),
-        format_func=lambda eid: f"{manager_employees[manager_employees['ID'].astype(str) == eid].iloc[0]['name']} ({eid})",
+        format_func=lambda eid: (
+            f"{manager_employees[manager_employees['ID'].astype(str) == eid].iloc[0]['name']}"
+            f" - Role: {manager_employees[manager_employees['ID'].astype(str) == eid].iloc[0].get('job_title', '')} ({eid})"
+        ),
     )
 
     selected_employee = manager_employees[manager_employees["ID"].astype(str) == selected_employee_id].iloc[0]
     st.write(
         f"Employee: {selected_employee.get('name', '')} | "
-        f"Branch: {selected_employee.get('branch', '')} | "
-        f"Dept: {selected_employee.get('dept', '')} | "
-        f"Title: {selected_employee.get('job_title', '')}"
+        f"Role: {selected_employee.get('job_title', '')}"
     )
 
     scoped_questions = prepare_9box_questions(st.session_state.questions_df, selected_employee)
@@ -484,7 +485,11 @@ with tab_submit:
     total_points, yes_count, no_count, nine_box_rating = calculate_9box_metrics(answers, scoped_questions)
     level_details = get_level_details(st.session_state.get("levels_df", pd.DataFrame()), nine_box_rating)
 
-    name_col, performance_col, potential_col = st.columns(3)
+    comments = st.text_area("Manager comments (optional)", height=120)
+
+    st.divider()
+    score_col, name_col, performance_col, potential_col = st.columns(4)
+    score_col.metric("Score", f"{nine_box_rating}")
     name_col.metric("Level", level_details.get("name", "") if level_details is not None else "")
     performance_col.metric(
         "Performance",
@@ -494,11 +499,6 @@ with tab_submit:
         "Potential",
         level_details.get("potential", "") if level_details is not None else "",
     )
-
-    comments = st.text_area("Manager comments (optional)", height=120)
-
-    st.divider()
-    st.metric("Total Points", f"{total_points}")
 
     if st.button("Submit Rating", type="primary"):
         entry = create_response_entry(
