@@ -743,12 +743,13 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
                     return;
                 }
 
-                var appText = getThemeTextColor(appRoot);
                 var appBackground = getThemeBackgroundColor(appRoot);
 
                 layouts.forEach(function (layout) {
-                    layout.style.setProperty('--ninebox-text', appText);
-                    layout.style.setProperty('--ninebox-axis-text', appText);
+                    var contentContainer = layout.closest('[data-testid="stMarkdownContainer"]') || layout.parentElement || appRoot;
+                    var contentText = window.getComputedStyle(contentContainer).color || getThemeTextColor(appRoot);
+                    layout.style.setProperty('--ninebox-text', contentText);
+                    layout.style.setProperty('--ninebox-axis-text', contentText);
                     layout.style.setProperty('--ninebox-bg', appBackground);
                 });
             }
