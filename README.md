@@ -28,10 +28,12 @@ This Streamlit app supports manager-only 9 box evaluations backed by Google Shee
 - ID
 - name
 - email
+- job_name
+- manager_name
 - manager_email
-- branch (optional)
-- dept (optional)
-- job_title (recommended)
+- location
+- department
+- role
 
 ### Managers
 
@@ -49,7 +51,7 @@ The Questions tab should have exactly:
 - role
 
 Notes:
-- role should match Employees.job_title (case-insensitive)
+- role should match Employees.role, falling back to Employees.job_name when needed (case-insensitive)
 - comma-separated role values are supported
 - blank role applies to all roles
 
@@ -93,10 +95,12 @@ streamlit run streamlit_app.py
 
 ## UI behavior
 
+- The 9 Box Evaluation tab shows the next pending employee automatically and displays a completion message once all assigned employees are reviewed.
 - Individual question point values are not shown on the main evaluation screen.
 - The main evaluation screen shows only the level name, performance, and potential while answers are selected.
 - Total points are shown at the bottom of the evaluation screen.
-- Submitted 9 Box Evaluations shows each employee with their full level details, including focus, steps, and description.
+- Submitted 9 Box Evaluations shows each employee's name, role, location, department, and full level details, including focus, steps, and description.
+- Saved evaluations can be deleted from the Submitted 9 Box Evaluations tab to start over.
 
 ## Migration note for existing data
 

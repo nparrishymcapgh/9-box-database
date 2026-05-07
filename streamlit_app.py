@@ -206,6 +206,52 @@ def row_role_matches_question(role_cell, employee_role):
     return employee_role_text in role_tokens
 
 
+def get_row_value(row, candidates, default=""):
+    if row is None:
+        return default
+
+    if hasattr(row, "keys"):
+        keys = list(row.keys())
+    elif isinstance(row, dict):
+        keys = list(row.keys())
+    else:
+        keys = []
+
+    lowered = {str(key).strip().lower(): key for key in keys}
+    for candidate in candidates:
+        actual = lowered.get(str(candidate).strip().lower())
+        if actual is None:
+            continue
+        value = normalize_text(row.get(actual, ""))
+        if value:
+            return value
+    return default
+
+
+def get_employee_id(employee_row):
+    return get_row_value(employee_row, ["ID", "id"])
+
+
+def get_employee_name(employee_row):
+    return get_row_value(employee_row, ["name", "employee_name"])
+
+
+def get_employee_email(employee_row):
+    return get_row_value(employee_row, ["email", "employee_email"])
+
+
+def get_employee_role(employee_row):
+    return get_row_value(employee_row, ["role", "job_name", "job_title"])
+
+
+def get_employee_location(employee_row):
+    return get_row_value(employee_row, ["location", "branch"])
+
+
+def get_employee_department(employee_row):
+    return get_row_value(employee_row, ["department", "dept"])
+
+
 def prepare_9box_questions(questions_df, employee_row):
     if questions_df.empty:
         return pd.DataFrame(columns=["ID", "question", "points", "role"])
@@ -218,7 +264,7 @@ def prepare_9box_questions(questions_df, employee_row):
     if not id_column or not points_column or not question_column:
         return pd.DataFrame(columns=["ID", "question", "points", "role"])
 
-    employee_role = employee_row.get("role", employee_row.get("job_title", ""))
+    employee_role = get_employee_role(employee_row)
     scoped = questions_df.copy()
     if role_column:
         scoped = scoped[scoped[role_column].apply(lambda cell: row_role_matches_question(cell, employee_role))].copy()
@@ -324,12 +370,6 @@ def get_resources_for_score(resources_df, score):
         if name and link:
             resources.append({"name": name, "link": link})
     return resources
-
-
-def get_employee_role(employee_row):
-    return normalize_text(employee_row.get("role", employee_row.get("job_title", "")))
-
-
 def score_to_9box_rating(total_points):
     try:
         return max(1, min(9, int(float(total_points))))
@@ -480,18 +520,23 @@ def validate_manager_credentials(managers_df, email, password):
 def create_response_entry(manager_email, manager_name, employee, answers, comments, metrics):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     total_points, _, no_count, _ = metrics
+    employee_id = get_employee_id(employee)
+    employee_name = get_employee_name(employee)
+    employee_email = get_employee_email(employee)
     employee_role = get_employee_role(employee)
+    employee_location = get_employee_location(employee)
+    employee_department = get_employee_department(employee)
     return {
         "response_id": str(uuid.uuid4()),
         "created_at": now,
         "updated_at": now,
         "manager_email": manager_email,
         "manager_name": manager_name,
-        "employee_id": str(employee.get("ID", "")),
-        "employee_name": str(employee.get("name", "")),
-        "employee_email": str(employee.get("email", "")),
-        "branch": str(employee.get("branch", "")),
-        "dept": str(employee.get("dept", "")),
+        "employee_id": employee_id,
+        "employee_name": employee_name,
+        "employee_email": employee_email,
+        "branch": employee_location,
+        "dept": employee_department,
         "job_title": employee_role,
         "executive_email": "",
         "questions_score": total_points,
@@ -616,10 +661,18 @@ if employees_df.empty:
 manager_employees = employees_df[
     employees_df["manager_email"].astype(str).str.strip().str.lower() == manager_email
 ].copy()
+manager_employees = manager_employees.sort_values("name").copy()
 
 if manager_employees.empty:
     st.warning("No employees are assigned to this manager email in the Employees sheet.")
     st.stop()
+
+pending_manager_employees = manager_employees[
+    manager_employees.apply(
+        lambda row: get_existing_employee_evaluation(responses_df, manager_email, get_employee_id(row)) is None,
+        axis=1,
+    )
+].copy()
 
 if st.session_state.submission_message:
     if st.session_state.submission_message_type == "success":
@@ -638,45 +691,34 @@ with tab_submit:
 
     levels_df = st.session_state.get("levels_df", pd.DataFrame())
     resources_df = st.session_state.get("resources_df", pd.DataFrame())
-    for _, employee in manager_employees.sort_values("name").iterrows():
-        employee_id = str(employee.get("ID", "")).strip()
-        employee_name = str(employee.get("name", "")).strip()
+    if pending_manager_employees.empty:
+        st.success("All assigned employees have been reviewed. You're good to go.")
+    else:
+        employee = pending_manager_employees.iloc[0]
+        employee_id = get_employee_id(employee)
+        employee_name = get_employee_name(employee)
         employee_role = get_employee_role(employee)
-        expander_label = f"{employee_name} - Role: {employee_role}"
+        employee_location = get_employee_location(employee)
+        employee_department = get_employee_department(employee)
 
-        with st.expander(expander_label):
-            st.write(f"Employee: {employee_name} | Role: {employee_role}")
+        st.info(
+            f"Next employee in line: {employee_name}"
+            f" | Role: {employee_role or 'Not provided'}"
+            f" | Location: {employee_location or 'Not provided'}"
+            f" | Department: {employee_department or 'Not provided'}"
+        )
+        st.caption(
+            f"Remaining evaluations including this one: {len(pending_manager_employees)} "
+            f"of {len(manager_employees)} assigned employees"
+        )
 
-            scoped_questions = prepare_9box_questions(st.session_state.questions_df, employee)
-            if scoped_questions.empty:
-                st.warning(
-                    "No matching questions found for this employee role. "
-                    "Questions tab must include columns: ID, points, question, role."
-                )
-                continue
-
-            existing_evaluation = get_existing_employee_evaluation(
-                responses_df,
-                st.session_state.manager_email,
-                employee_id,
+        scoped_questions = prepare_9box_questions(st.session_state.questions_df, employee)
+        if scoped_questions.empty:
+            st.warning(
+                "No matching questions found for this employee role. "
+                "Questions tab must include columns: ID, points, question, role."
             )
-
-            if existing_evaluation is not None:
-                st.info("This employee already has a saved evaluation.")
-                render_saved_evaluation_details(existing_evaluation, levels_df, resources_df, scoped_questions)
-                if st.button("Delete and redo evaluation", key=f"delete_{employee_id}"):
-                    deleted = delete_response(existing_evaluation.get("response_id", ""))
-                    clear_data_caches()
-                    st.session_state.data_loaded = False
-                    if deleted:
-                        st.session_state.submission_message = f"Deleted saved evaluation for {employee_name}."
-                        st.session_state.submission_message_type = "success"
-                    else:
-                        st.session_state.submission_message = f"Could not delete saved evaluation for {employee_name}."
-                        st.session_state.submission_message_type = "warning"
-                    st.rerun()
-                continue
-
+        else:
             answers = {}
             for _, question in scoped_questions.iterrows():
                 qid = str(question.get("ID", "")).strip()
@@ -731,15 +773,39 @@ with tab_status:
         resources_df = st.session_state.get("resources_df", pd.DataFrame())
 
         for _, saved_row in mine.iterrows():
-            employee_name = str(saved_row.get("employee_name", "")).strip()
-            employee_role = normalize_text(saved_row.get("job_title", ""))
             employee_id = str(saved_row.get("employee_id", "")).strip()
-            label = f"{employee_name} - Role: {employee_role}"
-
             employee_row = manager_employees[manager_employees["ID"].astype(str) == employee_id]
+            summary_row = employee_row.iloc[0] if not employee_row.empty else saved_row
+            employee_name = get_employee_name(summary_row) or normalize_text(saved_row.get("employee_name", ""))
+            employee_role = get_employee_role(summary_row) or normalize_text(saved_row.get("job_title", ""))
+            employee_location = get_employee_location(summary_row) or normalize_text(saved_row.get("branch", ""))
+            employee_department = get_employee_department(summary_row) or normalize_text(saved_row.get("dept", ""))
+            label = (
+                f"{employee_name}"
+                f" | Role: {employee_role or 'Not provided'}"
+                f" | Location: {employee_location or 'Not provided'}"
+                f" | Department: {employee_department or 'Not provided'}"
+            )
+
             question_rows = pd.DataFrame()
             if not employee_row.empty:
                 question_rows = prepare_9box_questions(st.session_state.questions_df, employee_row.iloc[0])
 
             with st.expander(label):
+                st.write(
+                    f"Employee: {employee_name} | Role: {employee_role or 'Not provided'} | "
+                    f"Location: {employee_location or 'Not provided'} | "
+                    f"Department: {employee_department or 'Not provided'}"
+                )
                 render_saved_evaluation_details(saved_row, levels_df, resources_df, question_rows)
+                if st.button("Delete and start over", key=f"status_delete_{saved_row.get('response_id', employee_id)}"):
+                    deleted = delete_response(saved_row.get("response_id", ""))
+                    clear_data_caches()
+                    st.session_state.data_loaded = False
+                    if deleted:
+                        st.session_state.submission_message = f"Deleted saved evaluation for {employee_name}."
+                        st.session_state.submission_message_type = "success"
+                    else:
+                        st.session_state.submission_message = f"Could not delete saved evaluation for {employee_name}."
+                        st.session_state.submission_message_type = "warning"
+                    st.rerun()
