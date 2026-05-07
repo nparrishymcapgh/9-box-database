@@ -542,35 +542,12 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             --ninebox-soft-border: color-mix(in srgb, var(--ninebox-text) 18%, transparent);
             --ninebox-muted: color-mix(in srgb, var(--ninebox-text) 76%, transparent);
             --ninebox-empty: color-mix(in srgb, var(--ninebox-text) 52%, transparent);
-            --ninebox-cell-bg: color-mix(in srgb, var(--background-color, #ffffff) 92%, transparent);
+            --ninebox-cell-bg: var(--background-color, #ffffff);
             display: grid;
             grid-template-columns: 96px minmax(0, 1fr);
             gap: 0.75rem;
             align-items: stretch;
             margin: 1rem 0 1.5rem 0;
-        }
-        @media (prefers-color-scheme: dark) {
-            .ninebox-layout {
-                --ninebox-text: #ffffff;
-                --ninebox-border: color-mix(in srgb, #ffffff 38%, transparent);
-                --ninebox-soft-border: color-mix(in srgb, #ffffff 22%, transparent);
-                --ninebox-muted: color-mix(in srgb, #ffffff 82%, transparent);
-                --ninebox-empty: color-mix(in srgb, #ffffff 62%, transparent);
-                --ninebox-cell-bg: #000000;
-            }
-        }
-        [data-theme="dark"] .ninebox-layout,
-        [data-baseweb="theme-provider"][data-theme="dark"] .ninebox-layout,
-        html[data-theme="dark"] .ninebox-layout,
-        .stApp[data-theme="dark"] .ninebox-layout,
-        .stApp[theme="dark"] .ninebox-layout,
-        .stApp .theme-dark .ninebox-layout {
-            --ninebox-text: #ffffff;
-            --ninebox-border: color-mix(in srgb, #ffffff 38%, transparent);
-            --ninebox-soft-border: color-mix(in srgb, #ffffff 22%, transparent);
-            --ninebox-muted: color-mix(in srgb, #ffffff 82%, transparent);
-            --ninebox-empty: color-mix(in srgb, #ffffff 62%, transparent);
-            --ninebox-cell-bg: #000000;
         }
         .ninebox-y-axis {
             display: flex;
@@ -580,10 +557,11 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             min-height: 560px;
         }
         .ninebox-y-axis-rotated {
-            width: 460px;
+            width: 330px;
             transform: rotate(-90deg);
             transform-origin: center;
-            gap: 0.35rem;
+            grid-template-columns: 0.7fr 1fr 0.7fr;
+            gap: 0.32rem;
         }
         .ninebox-axis-label-row {
             color: var(--ninebox-text);

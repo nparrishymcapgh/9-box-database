@@ -3,6 +3,8 @@
 - Standardized nine-box axis formatting by matching Potential to Performance styling and rotating the Potential axis 90 degrees left with a right-pointing arrow and Low-to-High labels.
 - Fixed nine-box dark-mode styling so axis labels and text render in white and grid-cell fills render black for proper contrast.
 - Reduced spacing on the rotated Potential axis labels for a tighter High/Potential/Low fit and expanded dark-mode detection so nine-box text and cell fills switch reliably.
+- Tightened the rotated Potential Low/Potential/High spacing further to approximately half of the Performance-axis spacing.
+- Reworked nine-box theming to rely on Streamlit theme variables only so text, borders, and backgrounds switch dynamically with app light/dark mode.
 - Reduced the Responses sheet schema to the fields used by the manager-only workflow and removed legacy executive, agreement, token, status, and no-count columns.
 - Fixed the submitted-evaluations delete action crash caused by an undefined employee identifier in the expander button key.
 - Restyled the nine-box grid to use theme-aware outlines, higher-contrast axis labels, and employee name plus job name in each cell.
