@@ -688,11 +688,20 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         """
         <script>
         (function () {
-            if (window.__nineboxThemeSyncInitialized) {
+            var SCRIPT_VERSION = 'ninebox-theme-v2';
+
+            if (
+                window.__nineboxThemeSyncInitialized
+                && window.__nineboxThemeSyncVersion === SCRIPT_VERSION
+            ) {
                 if (typeof window.__nineboxApplyTheme === "function") {
                     window.__nineboxApplyTheme();
                 }
                 return;
+            }
+
+            if (window.__nineboxThemeObserver && typeof window.__nineboxThemeObserver.disconnect === 'function') {
+                window.__nineboxThemeObserver.disconnect();
             }
 
             function getCssVar(element, name) {
@@ -773,6 +782,15 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
                 return luminance < 0.5;
             }
 
+            function isLightColor(colorValue) {
+                var rgb = parseColor(colorValue);
+                if (!rgb) {
+                    return false;
+                }
+                var luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+                return luminance > 0.6;
+            }
+
             function applyTheme() {
                 var appRoot = document.querySelector('.stApp') || document.body;
                 var layouts = document.querySelectorAll('.ninebox-layout');
@@ -781,20 +799,21 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
                 }
 
                 var appBackground = getThemeBackgroundColor(appRoot);
-                var darkMode = isDarkColor(appBackground);
 
                 layouts.forEach(function (layout) {
                     var contentContainer = layout.closest('[data-testid="stMarkdownContainer"]') || layout.parentElement || appRoot;
                     var contentText = window.getComputedStyle(contentContainer).color || getThemeTextColor(appRoot);
+                    var darkMode = isLightColor(contentText) || isDarkColor(appBackground);
                     layout.style.setProperty('--ninebox-text', contentText);
                     layout.style.setProperty('--ninebox-axis-text', contentText);
                     layout.style.setProperty('--ninebox-bg', appBackground);
-                    layout.style.setProperty('--ninebox-cell-bg', darkMode ? '#000000' : '#ffffff');
+                    layout.style.setProperty('--ninebox-cell-bg', darkMode ? '#000000' : '#ffffff', 'important');
                 });
             }
 
             window.__nineboxApplyTheme = applyTheme;
             window.__nineboxThemeSyncInitialized = true;
+            window.__nineboxThemeSyncVersion = SCRIPT_VERSION;
             applyTheme();
 
             var observer = new MutationObserver(applyTheme);
@@ -803,6 +822,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
                 attributes: true,
                 attributeFilter: ['class', 'style', 'data-theme']
             });
+            window.__nineboxThemeObserver = observer;
 
             window.addEventListener('resize', applyTheme);
         })();
