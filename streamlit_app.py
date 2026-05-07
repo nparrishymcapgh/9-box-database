@@ -536,6 +536,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
     st.markdown(
         """
         <style>
+        /* ninebox-style-v3 */
         .ninebox-layout {
             --ninebox-text: currentColor;
             --ninebox-axis-text: currentColor;
@@ -594,8 +595,42 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             border: 1.5px solid var(--ninebox-border);
             border-radius: 14px;
             padding: 0.85rem;
-            background: var(--ninebox-cell-bg);
+            background: #ffffff !important;
             box-shadow: none;
+        }
+        html[data-theme='dark'] .ninebox-cell,
+        body[data-theme='dark'] .ninebox-cell,
+        .stApp[data-theme='dark'] .ninebox-cell,
+        [data-testid='stAppViewContainer'][data-theme='dark'] .ninebox-cell,
+        html.dark .ninebox-cell,
+        body.dark .ninebox-cell,
+        .stApp.dark .ninebox-cell,
+        html.theme-dark .ninebox-cell,
+        body.theme-dark .ninebox-cell,
+        .stApp.theme-dark .ninebox-cell {
+            background: #000000 !important;
+        }
+        html[data-theme='light'] .ninebox-cell,
+        body[data-theme='light'] .ninebox-cell,
+        .stApp[data-theme='light'] .ninebox-cell,
+        [data-testid='stAppViewContainer'][data-theme='light'] .ninebox-cell,
+        html.light .ninebox-cell,
+        body.light .ninebox-cell,
+        .stApp.light .ninebox-cell,
+        html.theme-light .ninebox-cell,
+        body.theme-light .ninebox-cell,
+        .stApp.theme-light .ninebox-cell {
+            background: #ffffff !important;
+        }
+        @media (prefers-color-scheme: dark) {
+            .ninebox-cell {
+                background: #000000 !important;
+            }
+        }
+        @media (prefers-color-scheme: light) {
+            .ninebox-cell {
+                background: #ffffff !important;
+            }
         }
         .ninebox-cell-header {
             display: flex;
@@ -832,7 +867,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
     )
     st.markdown(
         (
-            "<div class='ninebox-layout'>"
+            "<div class='ninebox-layout' data-ninebox-style='v3'>"
             "<div class='ninebox-y-axis'>"
             "<div class='ninebox-y-axis-rotated ninebox-axis-label-row ninebox-axis-text'>Low&#9;&#9;&#9;&#9;&#9;&#9;&#9;Potential &rarr;&#9;&#9;&#9;&#9;&#9;&#9;&#9;High</div>"
             "</div>"
