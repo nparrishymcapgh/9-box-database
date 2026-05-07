@@ -689,128 +689,60 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         """
         <script>
         (function () {
-            var SCRIPT_VERSION = 'ninebox-theme-v5';
-
-            if (
-                window.__nineboxThemeSyncInitialized
-                && window.__nineboxThemeSyncVersion === SCRIPT_VERSION
-            ) {
-                if (typeof window.__nineboxApplyTheme === "function") {
-                    window.__nineboxApplyTheme();
-                }
-                return;
-            }
-
-            if (window.__nineboxThemeObserver && typeof window.__nineboxThemeObserver.disconnect === 'function') {
-                window.__nineboxThemeObserver.disconnect();
-            }
-
-            /* Parse rgb/rgba/hex -> {r,g,b} or null */
-            function parseRgb(color) {
-                var m = (color || '').match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
-                if (m) { return { r: +m[1], g: +m[2], b: +m[3] }; }
-                var h = (color || '').match(/^#([0-9a-f]{3,6})$/i);
-                if (h) {
-                    var s = h[1].length === 3
-                        ? h[1].split('').map(function(c){ return c+c; }).join('')
-                        : h[1];
-                    return {
-                        r: parseInt(s.slice(0,2),16),
-                        g: parseInt(s.slice(2,4),16),
-                        b: parseInt(s.slice(4,6),16)
-                    };
-                }
-                return null;
-            }
-
-            function luminance(color) {
-                var rgb = parseRgb(color);
-                if (!rgb) { return -1; }
-                return (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
-            }
-
             /*
-             * Walk UP the real DOM from startEl to find the first ancestor
-             * (including startEl itself) that has a non-transparent
-             * background-color. This bypasses CSS-variable resolution issues
-             * and always gives the actual rendered background.
+             * Streamlit uses Emotion CSS-in-JS to apply theme changes.
+             * It injects/swaps <style> tags — NOT DOM attributes.
+             * MutationObserver with attributeFilter never fires on theme switch.
+             * Solution: poll on a short interval to read the real computed
+             * body background and update cells accordingly.
              */
-            function resolvedBackground(startEl) {
-                var el = startEl;
-                while (el && el !== document.documentElement.parentElement) {
-                    var bg = window.getComputedStyle(el).backgroundColor || '';
+
+            /* Cancel any previously running interval from a prior script injection */
+            if (window.__nineboxIntervalId) {
+                clearInterval(window.__nineboxIntervalId);
+            }
+
+            function getLuminance(rgbString) {
+                var m = (rgbString || '').match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+                if (!m) { return 1; }
+                return (0.299 * +m[1] + 0.587 * +m[2] + 0.114 * +m[3]) / 255;
+            }
+
+            function getBodyBackground() {
+                /* Streamlit writes the page background onto document.body */
+                var els = [document.body, document.documentElement];
+                for (var i = 0; i < els.length; i++) {
+                    var bg = window.getComputedStyle(els[i]).backgroundColor;
                     if (bg && bg !== 'transparent' && bg !== 'rgba(0, 0, 0, 0)') {
                         return bg;
                     }
-                    el = el.parentElement;
                 }
-                /* Absolute fallback: check html then body inline style */
-                var checks = [document.documentElement, document.body];
-                for (var i = 0; i < checks.length; i++) {
-                    var bg2 = window.getComputedStyle(checks[i]).backgroundColor || '';
-                    if (bg2 && bg2 !== 'transparent' && bg2 !== 'rgba(0, 0, 0, 0)') {
-                        return bg2;
-                    }
-                }
-                return '#ffffff';
+                return 'rgb(255,255,255)';
             }
 
-            function resolvedTextColor(startEl) {
-                var el = startEl;
-                while (el && el !== document.documentElement.parentElement) {
-                    var c = window.getComputedStyle(el).color || '';
-                    var lum = luminance(c);
-                    /* skip colors that are effectively invisible (fully transparent proxy) */
-                    if (lum >= 0) { return c; }
-                    el = el.parentElement;
-                }
-                return '#111827';
-            }
+            var _lastBg = null;
 
             function applyTheme() {
+                var bg = getBodyBackground();
+                /* Skip if nothing changed — avoids unnecessary DOM writes */
+                if (bg === _lastBg) { return; }
+                _lastBg = bg;
+
+                var isDark = getLuminance(bg) < 0.5;
+                var cellBg = isDark ? '#000000' : '#ffffff';
+
                 var layouts = document.querySelectorAll('.ninebox-layout');
-                if (!layouts.length) { return; }
-
                 layouts.forEach(function (layout) {
-                    var bg = resolvedBackground(layout);
-                    var fg = resolvedTextColor(layout);
-                    var isDark = luminance(bg) < 0.5;
-                    var cellBg = isDark ? '#000000' : '#ffffff';
-
-                    layout.style.setProperty('--ninebox-text', fg);
-                    layout.style.setProperty('--ninebox-axis-text', fg);
-                    layout.style.setProperty('--ninebox-bg', bg);
                     layout.style.setProperty('--ninebox-cell-bg', cellBg);
-
                     layout.querySelectorAll('.ninebox-cell').forEach(function (cell) {
-                        cell.style.backgroundColor = cellBg;
+                        cell.style.setProperty('background-color', cellBg, 'important');
                     });
                 });
             }
 
-            window.__nineboxApplyTheme = applyTheme;
-            window.__nineboxThemeSyncInitialized = true;
-            window.__nineboxThemeSyncVersion = SCRIPT_VERSION;
+            /* Run immediately, then poll every 400 ms */
             applyTheme();
-
-            var observer = new MutationObserver(function(mutations) {
-                /* Only re-run if a background or class changed — avoids thrash */
-                for (var i = 0; i < mutations.length; i++) {
-                    var t = mutations[i].target;
-                    if (t && t.querySelectorAll) {
-                        applyTheme();
-                        return;
-                    }
-                }
-            });
-            observer.observe(document.documentElement, {
-                subtree: true,
-                attributes: true,
-                attributeFilter: ['class', 'style', 'data-theme']
-            });
-            window.__nineboxThemeObserver = observer;
-
-            window.addEventListener('resize', applyTheme);
+            window.__nineboxIntervalId = setInterval(applyTheme, 400);
         })();
         </script>
         """,
