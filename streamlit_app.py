@@ -33,6 +33,8 @@ RESOURCE_TABS = ["Resource", "Resources"]
 DEFAULT_DATA_SYNC_MINUTES = 5
 LOCKED_SCORE_QUESTION_ID = "64"
 LOCKED_SCORE_VALUE = 3
+HIGH_SCORE_LOCK_QUESTION_ID = "65"
+HIGH_SCORE_LOCK_VALUE = 9
 
 # Responses sheet now stores only the fields used by the manager workflow.
 MANAGER_RESPONSE_COLUMNS = [
@@ -831,6 +833,10 @@ def calculate_9box_metrics(answers, question_rows, base_points=8):
     if lock_answer == "yes":
         return LOCKED_SCORE_VALUE, LOCKED_SCORE_VALUE
 
+    high_score_lock_answer = normalize_text_lower(answers.get(HIGH_SCORE_LOCK_QUESTION_ID, ""))
+    if high_score_lock_answer == "no":
+        return HIGH_SCORE_LOCK_VALUE, HIGH_SCORE_LOCK_VALUE
+
     points_lookup = {
         str(row.get("ID", "")).strip(): parse_question_points(row.get("points", 0))
         for _, row in question_rows.iterrows()
@@ -1072,7 +1078,11 @@ with tab_submit:
             for _, question in scoped_questions.iterrows():
                 qid = str(question.get("ID", "")).strip()
                 prompt = str(question.get("question", "")).strip()
-                default_index = 1 if qid == LOCKED_SCORE_QUESTION_ID else 0
+                default_index = 0
+                if qid == LOCKED_SCORE_QUESTION_ID:
+                    default_index = 1
+                elif qid == HIGH_SCORE_LOCK_QUESTION_ID:
+                    default_index = 0
                 answers[qid] = st.radio(
                     prompt,
                     options=["Yes", "No"],
