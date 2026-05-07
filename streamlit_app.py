@@ -1210,6 +1210,8 @@ with tab_submit:
 
 with tab_status:
     st.markdown("### Submitted 9 Box Evaluations")
+    show_indirect_reports = st.toggle("Show Indirect Reports", value=True, key="show_indirect_reports")
+
     descendant_ids = {
         normalize_text(get_employee_id(row))
         for _, row in all_manager_employees.iterrows()
@@ -1221,9 +1223,10 @@ with tab_status:
         if normalize_text(get_employee_id(row))
     }
 
-    mine = responses_df[
-        responses_df["employee_id"].astype(str).str.strip().isin(descendant_ids)
-    ].copy()
+    visible_employee_ids = descendant_ids if show_indirect_reports else direct_report_ids
+    visible_employee_scope = all_manager_employees if show_indirect_reports else direct_manager_employees
+
+    mine = responses_df[responses_df["employee_id"].astype(str).str.strip().isin(visible_employee_ids)].copy()
 
     latest_eval_by_employee = get_latest_evaluations_by_employee(mine)
     team_rows = []
@@ -1250,22 +1253,24 @@ with tab_status:
             }
         )
 
-    st.markdown("#### Team Summary")
-    if team_rows:
-        st.dataframe(pd.DataFrame(team_rows), use_container_width=True, hide_index=True)
+    with st.expander("Team Summary", expanded=False):
+        if team_rows:
+            st.dataframe(pd.DataFrame(team_rows), use_container_width=True, hide_index=True)
+        else:
+            st.info("No employees found in your team hierarchy.")
 
     if mine.empty:
-        st.info("No ratings submitted yet for your team.")
+        st.info("No ratings submitted yet for the currently visible employee scope.")
     else:
         mine = mine.sort_values("created_at", ascending=False)
         levels_df = st.session_state.get("levels_df", pd.DataFrame())
         resources_df = st.session_state.get("resources_df", pd.DataFrame())
 
         st.markdown("#### 9 Box Grid")
-        render_9box_grid(mine, all_manager_employees, levels_df)
+        render_9box_grid(mine, visible_employee_scope, levels_df)
 
         for _, saved_row in mine.iterrows():
-            employee_summary = get_saved_employee_summary(saved_row, all_manager_employees)
+            employee_summary = get_saved_employee_summary(saved_row, visible_employee_scope)
             employee_id = employee_summary["employee_id"]
             employee_name = employee_summary["employee_name"]
             employee_role = employee_summary["employee_role"]
