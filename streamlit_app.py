@@ -563,7 +563,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             transform-origin: center;
             display: block;
             text-align: center;
-            white-space: nowrap;
+            white-space: pre;
         }
         .ninebox-axis-label-row {
             color: var(--ninebox-text);
@@ -749,7 +749,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         (
             "<div class='ninebox-layout'>"
             "<div class='ninebox-y-axis'>"
-            "<div class='ninebox-y-axis-rotated ninebox-axis-label-row'>Low&nbsp;&nbsp;&nbsp;Potential &rarr;&nbsp;&nbsp;&nbsp;High</div>"
+            "<div class='ninebox-y-axis-rotated ninebox-axis-label-row'>Low&#9;&#9;&#9;&#9;&#9;&#9;&#9;Potential &rarr;&#9;&#9;&#9;&#9;&#9;&#9;&#9;High</div>"
             "</div>"
             "<div class='ninebox-main'>"
             f"<div class='ninebox-grid'>{''.join(cell_markup)}</div>"
