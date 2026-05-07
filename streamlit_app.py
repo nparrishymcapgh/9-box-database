@@ -533,9 +533,6 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             f"</div>"
         )
 
-    _theme_type = (st.context.theme or {}).get("type", "light") or "light"
-    _cell_bg = "#0e1117" if _theme_type == "dark" else "#ffffff"
-
     st.markdown(
         """
         <style>
@@ -689,7 +686,33 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         unsafe_allow_html=True,
     )
     st.markdown(
-        f"<style>.ninebox-layout{{--ninebox-cell-bg:{_cell_bg}}}.ninebox-cell{{background:{_cell_bg}!important}}</style>",
+        """
+        <script>
+        (function(){
+            function applyTheme(){
+                var app = document.querySelector('[data-testid="stApp"]') || document.querySelector('.stApp');
+                if(!app) return;
+                var bg = window.getComputedStyle(app).backgroundColor;
+                var m = bg.match(/rgba?\\((\\d+),(\\s*\\d+),(\\s*\\d+)/);
+                var isDark = false;
+                if(m){
+                    var r=parseInt(m[1]),g=parseInt(m[2]),b=parseInt(m[3]);
+                    if(r+g+b > 30){
+                        var lum = 0.299*r + 0.587*g + 0.114*b;
+                        isDark = lum < 128;
+                    }
+                }
+                var cells = document.querySelectorAll('.ninebox-cell');
+                var bg2 = isDark ? '#0e1117' : '#ffffff';
+                var root = document.querySelector('.ninebox-layout');
+                if(root) root.style.setProperty('--ninebox-cell-bg', bg2);
+                cells.forEach(function(c){ c.style.background = bg2; });
+            }
+            applyTheme();
+            setInterval(applyTheme, 400);
+        })();
+        </script>
+        """,
         unsafe_allow_html=True,
     )
     st.markdown(
