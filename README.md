@@ -5,13 +5,15 @@ This Streamlit app supports manager-only 9 box evaluations backed by Google Shee
 ## What the app does
 
 - Manager login only (email + password from the Managers tab)
-- Shows employees assigned to that manager
+- Uses manager hierarchy from Employees.manager_email:
+  - 9 Box Evaluation tab allows submissions for direct reports only
+  - Submitted 9 Box Evaluations shows all descendants (direct + indirect reports)
 - Loads role-based questions from the Questions tab
 - Scores each employee using:
   - Start at 8 points
   - Add question points for each Yes answer
 - Shows the matching level name, performance, and potential for the calculated score
-- Stores submissions in the Responses tab
+- Stores submissions in the Responses tab and tracks who completed each evaluation
 
 ## Required Google Sheet tabs
 
@@ -67,6 +69,27 @@ The Levels tab should include these columns:
 - focus
 - description
 
+### Responses
+
+The Responses tab is auto-normalized to include these fields:
+
+- response_id
+- created_at
+- updated_at
+- manager_email
+- manager_name
+- completed_by_email
+- completed_by_name
+- employee_id
+- employee_name
+- employee_email
+- location
+- department
+- job_name
+- questions_score
+- responses
+- comments
+
 ## Streamlit secrets
 
 Use .streamlit/secrets.toml locally, or Streamlit Cloud Secrets in deployment.
@@ -95,14 +118,15 @@ streamlit run streamlit_app.py
 
 ## UI behavior
 
-- The 9 Box Evaluation tab shows the next pending employee automatically and displays a completion message once all assigned employees are reviewed.
+- The 9 Box Evaluation tab shows the next pending direct report automatically and displays a completion message once all direct reports are reviewed.
 - Individual question point values are not shown on the main evaluation screen.
 - The main evaluation screen shows only the level name, performance, and potential while answers are selected.
 - Total points are shown at the bottom of the evaluation screen.
 - The app stores question responses and total score, but does not track per-evaluation no counts.
+- Submitted 9 Box Evaluations includes a Team Summary table with every descendant (direct and indirect report), their evaluation status, and who completed the latest evaluation.
 - Submitted 9 Box Evaluations renders a full 3x3 nine-box grid before the saved evaluations list, with score 9 in the bottom-left and score 1 in the top-right.
 - Submitted 9 Box Evaluations shows each employee's name, role, location, department, and full level details, including focus, steps, and description.
-- Saved evaluations can be deleted from the Submitted 9 Box Evaluations tab to start over.
+- Saved evaluations can only be deleted by the same manager who completed that evaluation.
 
 ## Migration note for existing data
 

@@ -39,6 +39,7 @@ HIGH_SCORE_LOCK_VALUE = 9
 # Responses sheet now stores only the fields used by the manager workflow.
 MANAGER_RESPONSE_COLUMNS = [
     "response_id", "created_at", "updated_at", "manager_email", "manager_name",
+    "completed_by_email", "completed_by_name",
     "employee_id", "employee_name", "employee_email", "location", "department",
     "job_name", "questions_score", "responses", "comments",
 ]
@@ -49,6 +50,8 @@ RESPONSE_COLUMN_ALIASES = {
     "updated_at": ["updated_at"],
     "manager_email": ["manager_email"],
     "manager_name": ["manager_name"],
+    "completed_by_email": ["completed_by_email", "evaluator_email", "manager_email"],
+    "completed_by_name": ["completed_by_name", "evaluator_name", "manager_name"],
     "employee_id": ["employee_id"],
     "employee_name": ["employee_name"],
     "employee_email": ["employee_email"],
@@ -475,6 +478,68 @@ def get_manager_employee_row(manager_employees, employee_id):
     return matches.iloc[0]
 
 
+def get_direct_reports(employees_df, manager_email):
+    if employees_df.empty or "manager_email" not in employees_df.columns:
+        return pd.DataFrame(columns=employees_df.columns if not employees_df.empty else [])
+
+    return employees_df[
+        employees_df["manager_email"].astype(str).str.strip().str.lower() == normalize_text_lower(manager_email)
+    ].copy()
+
+
+def get_all_descendant_reports(employees_df, manager_email):
+    if employees_df.empty or "manager_email" not in employees_df.columns:
+        return pd.DataFrame(columns=employees_df.columns if not employees_df.empty else [])
+
+    descendants = pd.DataFrame(columns=employees_df.columns)
+    queue = [normalize_text_lower(manager_email)]
+    visited_managers = set()
+    seen_employee_ids = set()
+
+    while queue:
+        current_manager = queue.pop(0)
+        if not current_manager or current_manager in visited_managers:
+            continue
+        visited_managers.add(current_manager)
+
+        direct_reports = employees_df[
+            employees_df["manager_email"].astype(str).str.strip().str.lower() == current_manager
+        ].copy()
+        if direct_reports.empty:
+            continue
+
+        for _, row in direct_reports.iterrows():
+            employee_id = get_employee_id(row)
+            dedupe_key = normalize_text(employee_id) or normalize_text_lower(get_employee_email(row))
+            if dedupe_key and dedupe_key in seen_employee_ids:
+                continue
+
+            descendants = pd.concat([descendants, row.to_frame().T], ignore_index=True)
+            if dedupe_key:
+                seen_employee_ids.add(dedupe_key)
+
+            employee_email = normalize_text_lower(get_employee_email(row))
+            if employee_email and employee_email not in visited_managers:
+                queue.append(employee_email)
+
+    return descendants
+
+
+def get_latest_evaluations_by_employee(evaluations_df):
+    latest_by_employee = {}
+    if evaluations_df.empty:
+        return latest_by_employee
+
+    sorted_df = evaluations_df.sort_values("created_at", ascending=False)
+    for _, row in sorted_df.iterrows():
+        employee_id = normalize_text(row.get("employee_id", ""))
+        if not employee_id or employee_id in latest_by_employee:
+            continue
+        latest_by_employee[employee_id] = row
+
+    return latest_by_employee
+
+
 def get_saved_employee_summary(saved_row, manager_employees):
     employee_id = normalize_text(saved_row.get("employee_id", ""))
     employee_row = get_manager_employee_row(manager_employees, employee_id)
@@ -741,14 +806,16 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
     )
 
 
-def get_existing_employee_evaluation(responses_df, manager_email, employee_id):
+def get_existing_employee_evaluation(responses_df, employee_id, completed_by_email=None):
     if responses_df.empty:
         return None
 
-    matches = responses_df[
-        (responses_df["manager_email"].astype(str).str.strip().str.lower() == normalize_text_lower(manager_email))
-        & (responses_df["employee_id"].astype(str).str.strip() == str(employee_id).strip())
-    ].copy()
+    matches = responses_df[responses_df["employee_id"].astype(str).str.strip() == str(employee_id).strip()].copy()
+
+    if completed_by_email is not None:
+        matches = matches[
+            matches["completed_by_email"].astype(str).str.strip().str.lower() == normalize_text_lower(completed_by_email)
+        ].copy()
 
     if matches.empty:
         return None
@@ -800,6 +867,10 @@ def render_saved_evaluation_details(saved_row, levels_df, resources_df, question
 
     render_level_summary(level_details, "Score", saved_score or "")
     st.caption(f"Saved: {saved_row.get('created_at', '')}")
+    completed_by_name = normalize_text(saved_row.get("completed_by_name", "")) or "Unknown"
+    completed_by_email = normalize_text(saved_row.get("completed_by_email", ""))
+    completed_by_label = f"{completed_by_name} ({completed_by_email})" if completed_by_email else completed_by_name
+    st.caption(f"Completed by: {completed_by_label}")
 
     if normalize_text(saved_row.get("comments", "")):
         st.markdown(f"**Manager comments:** {saved_row.get('comments', '')}")
@@ -899,6 +970,8 @@ def create_response_entry(manager_email, manager_name, employee, answers, commen
         "updated_at": now,
         "manager_email": manager_email,
         "manager_name": manager_name,
+        "completed_by_email": manager_email,
+        "completed_by_name": manager_name,
         "employee_id": employee_id,
         "employee_name": employee_name,
         "employee_email": employee_email,
@@ -1013,18 +1086,21 @@ if employees_df.empty:
     st.warning("Employees sheet is empty.")
     st.stop()
 
-manager_employees = employees_df[
-    employees_df["manager_email"].astype(str).str.strip().str.lower() == manager_email
-].copy()
-manager_employees = manager_employees.sort_values("name").copy()
+direct_manager_employees = get_direct_reports(employees_df, manager_email)
+all_manager_employees = get_all_descendant_reports(employees_df, manager_email)
 
-if manager_employees.empty:
+if "name" in direct_manager_employees.columns:
+    direct_manager_employees = direct_manager_employees.sort_values("name").copy()
+if "name" in all_manager_employees.columns:
+    all_manager_employees = all_manager_employees.sort_values("name").copy()
+
+if all_manager_employees.empty:
     st.warning("No employees are assigned to this manager email in the Employees sheet.")
     st.stop()
 
-pending_manager_employees = manager_employees[
-    manager_employees.apply(
-        lambda row: get_existing_employee_evaluation(responses_df, manager_email, get_employee_id(row)) is None,
+pending_manager_employees = direct_manager_employees[
+    direct_manager_employees.apply(
+        lambda row: get_existing_employee_evaluation(responses_df, get_employee_id(row)) is None,
         axis=1,
     )
 ].copy()
@@ -1046,8 +1122,10 @@ with tab_submit:
 
     levels_df = st.session_state.get("levels_df", pd.DataFrame())
     resources_df = st.session_state.get("resources_df", pd.DataFrame())
-    if pending_manager_employees.empty:
-        st.success("All assigned employees have been reviewed. You're good to go.")
+    if direct_manager_employees.empty:
+        st.info("You do not have any direct reports to evaluate.")
+    elif pending_manager_employees.empty:
+        st.success("All direct reports have been reviewed. You're good to go.")
     else:
         employee = pending_manager_employees.iloc[0]
         employee_id = get_employee_id(employee)
@@ -1064,7 +1142,7 @@ with tab_submit:
         )
         st.caption(
             f"Remaining evaluations including this one: {len(pending_manager_employees)} "
-            f"of {len(manager_employees)} assigned employees"
+            f"of {len(direct_manager_employees)} direct reports"
         )
 
         scoped_questions = prepare_9box_questions(st.session_state.questions_df, employee)
@@ -1101,11 +1179,17 @@ with tab_submit:
                 latest_responses = load_responses()
                 duplicate = get_existing_employee_evaluation(
                     latest_responses,
-                    st.session_state.manager_email,
                     employee_id,
                 )
                 if duplicate is not None:
-                    st.session_state.submission_message = f"{employee_name} already has a saved evaluation. Delete it to redo the evaluation."
+                    existing_evaluator = normalize_text(duplicate.get("completed_by_name", "")) or normalize_text(
+                        duplicate.get("completed_by_email", "")
+                    )
+                    evaluator_text = f" by {existing_evaluator}" if existing_evaluator else ""
+                    st.session_state.submission_message = (
+                        f"{employee_name} already has a saved evaluation{evaluator_text}. "
+                        "Delete it to redo the evaluation."
+                    )
                     st.session_state.submission_message_type = "warning"
                     st.rerun()
 
@@ -1126,22 +1210,62 @@ with tab_submit:
 
 with tab_status:
     st.markdown("### Submitted 9 Box Evaluations")
+    descendant_ids = {
+        normalize_text(get_employee_id(row))
+        for _, row in all_manager_employees.iterrows()
+        if normalize_text(get_employee_id(row))
+    }
+    direct_report_ids = {
+        normalize_text(get_employee_id(row))
+        for _, row in direct_manager_employees.iterrows()
+        if normalize_text(get_employee_id(row))
+    }
+
     mine = responses_df[
-        responses_df["manager_email"].astype(str).str.strip().str.lower() == manager_email
+        responses_df["employee_id"].astype(str).str.strip().isin(descendant_ids)
     ].copy()
 
+    latest_eval_by_employee = get_latest_evaluations_by_employee(mine)
+    team_rows = []
+    for _, employee_row in all_manager_employees.iterrows():
+        employee_id = normalize_text(get_employee_id(employee_row))
+        latest_eval = latest_eval_by_employee.get(employee_id)
+        completed_by_name = normalize_text(latest_eval.get("completed_by_name", "")) if latest_eval is not None else ""
+        completed_by_email = normalize_text(latest_eval.get("completed_by_email", "")) if latest_eval is not None else ""
+        completed_by = completed_by_name or completed_by_email or ""
+        if completed_by_name and completed_by_email and completed_by_name != completed_by_email:
+            completed_by = f"{completed_by_name} ({completed_by_email})"
+
+        team_rows.append(
+            {
+                "employee_name": get_employee_name(employee_row),
+                "employee_id": employee_id,
+                "relationship": "Direct report" if employee_id in direct_report_ids else "Indirect report",
+                "role": get_employee_role(employee_row),
+                "location": get_employee_location(employee_row),
+                "department": get_employee_department(employee_row),
+                "status": "Evaluated" if latest_eval is not None else "Pending",
+                "completed_by": completed_by,
+                "last_saved": normalize_text(latest_eval.get("created_at", "")) if latest_eval is not None else "",
+            }
+        )
+
+    st.markdown("#### Team Summary")
+    if team_rows:
+        st.dataframe(pd.DataFrame(team_rows), use_container_width=True, hide_index=True)
+
     if mine.empty:
-        st.info("No ratings submitted yet.")
+        st.info("No ratings submitted yet for your team.")
     else:
         mine = mine.sort_values("created_at", ascending=False)
         levels_df = st.session_state.get("levels_df", pd.DataFrame())
         resources_df = st.session_state.get("resources_df", pd.DataFrame())
 
         st.markdown("#### 9 Box Grid")
-        render_9box_grid(mine, manager_employees, levels_df)
+        render_9box_grid(mine, all_manager_employees, levels_df)
 
         for _, saved_row in mine.iterrows():
-            employee_summary = get_saved_employee_summary(saved_row, manager_employees)
+            employee_summary = get_saved_employee_summary(saved_row, all_manager_employees)
             employee_id = employee_summary["employee_id"]
             employee_name = employee_summary["employee_name"]
             employee_role = employee_summary["employee_role"]
@@ -1165,14 +1289,19 @@ with tab_status:
                     f"Department: {employee_department or 'Not provided'}"
                 )
                 render_saved_evaluation_details(saved_row, levels_df, resources_df, question_rows)
-                if st.button("Delete and start over", key=f"status_delete_{saved_row.get('response_id', employee_id)}"):
-                    deleted = delete_response(saved_row.get("response_id", ""))
-                    clear_data_caches()
-                    st.session_state.data_loaded = False
-                    if deleted:
-                        st.session_state.submission_message = f"Deleted saved evaluation for {employee_name}."
-                        st.session_state.submission_message_type = "success"
-                    else:
-                        st.session_state.submission_message = f"Could not delete saved evaluation for {employee_name}."
-                        st.session_state.submission_message_type = "warning"
-                    st.rerun()
+                saved_completed_by = normalize_text_lower(saved_row.get("completed_by_email", ""))
+                can_delete = saved_completed_by == normalize_text_lower(manager_email)
+                if can_delete:
+                    if st.button("Delete and start over", key=f"status_delete_{saved_row.get('response_id', employee_id)}"):
+                        deleted = delete_response(saved_row.get("response_id", ""))
+                        clear_data_caches()
+                        st.session_state.data_loaded = False
+                        if deleted:
+                            st.session_state.submission_message = f"Deleted saved evaluation for {employee_name}."
+                            st.session_state.submission_message_type = "success"
+                        else:
+                            st.session_state.submission_message = f"Could not delete saved evaluation for {employee_name}."
+                            st.session_state.submission_message_type = "warning"
+                        st.rerun()
+                else:
+                    st.caption("Only the manager who completed this evaluation can delete it.")

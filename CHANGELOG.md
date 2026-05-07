@@ -1,5 +1,10 @@
 # Unreleased
 
+- Added hierarchical team visibility so Submitted 9 Box Evaluations includes all descendants (direct and indirect reports) instead of only the current manager's direct reports.
+- Limited 9 Box Evaluation submissions to direct reports only, while preserving full descendant visibility on summary/grid pages.
+- Added explicit completed_by_email and completed_by_name response fields and surfaced evaluator identity in saved evaluation details and team summary.
+- Added a Team Summary table on Submitted 9 Box Evaluations listing every descendant employee, relationship (direct/indirect), status, evaluator, and last saved timestamp.
+- Restricted delete/start-over actions so only the manager who completed an evaluation can delete it.
 - Standardized nine-box axis formatting by matching Potential to Performance styling and rotating the Potential axis 90 degrees left with a right-pointing arrow and Low-to-High labels.
 - Fixed nine-box dark-mode styling so axis labels and text render in white and grid-cell fills render black for proper contrast.
 - Reduced spacing on the rotated Potential axis labels for a tighter High/Potential/Low fit and expanded dark-mode detection so nine-box text and cell fills switch reliably.
