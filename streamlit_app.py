@@ -544,7 +544,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             --ninebox-soft-border: color-mix(in srgb, var(--ninebox-text) 18%, transparent);
             --ninebox-muted: color-mix(in srgb, var(--ninebox-text) 76%, transparent);
             --ninebox-empty: color-mix(in srgb, var(--ninebox-text) 52%, transparent);
-            --ninebox-cell-bg: color-mix(in srgb, var(--ninebox-bg) 94%, var(--ninebox-text) 6%);
+            --ninebox-cell-bg: #ffffff;
             color: inherit;
             display: grid;
             grid-template-columns: 92px minmax(0, 1fr);
@@ -736,6 +736,43 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
                 return firstSolidBackground([appRoot, body, html]);
             }
 
+            function parseColor(colorValue) {
+                var value = (colorValue || '').trim();
+                var rgbMatch = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+                if (rgbMatch) {
+                    return {
+                        r: Number(rgbMatch[1]),
+                        g: Number(rgbMatch[2]),
+                        b: Number(rgbMatch[3])
+                    };
+                }
+
+                var hexMatch = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+                if (!hexMatch) {
+                    return null;
+                }
+
+                var hex = hexMatch[1];
+                if (hex.length === 3) {
+                    hex = hex.split('').map(function (ch) { return ch + ch; }).join('');
+                }
+
+                return {
+                    r: parseInt(hex.slice(0, 2), 16),
+                    g: parseInt(hex.slice(2, 4), 16),
+                    b: parseInt(hex.slice(4, 6), 16)
+                };
+            }
+
+            function isDarkColor(colorValue) {
+                var rgb = parseColor(colorValue);
+                if (!rgb) {
+                    return false;
+                }
+                var luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+                return luminance < 0.5;
+            }
+
             function applyTheme() {
                 var appRoot = document.querySelector('.stApp') || document.body;
                 var layouts = document.querySelectorAll('.ninebox-layout');
@@ -744,6 +781,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
                 }
 
                 var appBackground = getThemeBackgroundColor(appRoot);
+                var darkMode = isDarkColor(appBackground);
 
                 layouts.forEach(function (layout) {
                     var contentContainer = layout.closest('[data-testid="stMarkdownContainer"]') || layout.parentElement || appRoot;
@@ -751,6 +789,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
                     layout.style.setProperty('--ninebox-text', contentText);
                     layout.style.setProperty('--ninebox-axis-text', contentText);
                     layout.style.setProperty('--ninebox-bg', appBackground);
+                    layout.style.setProperty('--ninebox-cell-bg', darkMode ? '#000000' : '#ffffff');
                 });
             }
 
