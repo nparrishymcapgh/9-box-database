@@ -536,7 +536,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
     st.markdown(
         """
         <style>
-        /* ninebox-style-v4 */
+        /* ninebox-style-v5 */
         .ninebox-layout {
             --ninebox-text: currentColor;
             --ninebox-axis-text: currentColor;
@@ -545,7 +545,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             --ninebox-soft-border: color-mix(in srgb, var(--ninebox-text) 18%, transparent);
             --ninebox-muted: color-mix(in srgb, var(--ninebox-text) 76%, transparent);
             --ninebox-empty: color-mix(in srgb, var(--ninebox-text) 52%, transparent);
-            --ninebox-cell-bg: #ffffff;
+            --ninebox-cell-bg: var(--background-color, #ffffff);
             color: inherit;
             display: grid;
             grid-template-columns: 92px minmax(0, 1fr);
@@ -689,7 +689,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         """
         <script>
         (function () {
-            var SCRIPT_VERSION = 'ninebox-theme-v3';
+            var SCRIPT_VERSION = 'ninebox-theme-v4';
 
             if (
                 window.__nineboxThemeSyncInitialized
@@ -746,87 +746,6 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
                 return firstSolidBackground([appRoot, body, html]);
             }
 
-            function parseColor(colorValue) {
-                var value = (colorValue || '').trim();
-                var rgbMatch = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-                if (rgbMatch) {
-                    return {
-                        r: Number(rgbMatch[1]),
-                        g: Number(rgbMatch[2]),
-                        b: Number(rgbMatch[3])
-                    };
-                }
-
-                var hexMatch = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-                if (!hexMatch) {
-                    return null;
-                }
-
-                var hex = hexMatch[1];
-                if (hex.length === 3) {
-                    hex = hex.split('').map(function (ch) { return ch + ch; }).join('');
-                }
-
-                return {
-                    r: parseInt(hex.slice(0, 2), 16),
-                    g: parseInt(hex.slice(2, 4), 16),
-                    b: parseInt(hex.slice(4, 6), 16)
-                };
-            }
-
-            function isDarkColor(colorValue) {
-                var rgb = parseColor(colorValue);
-                if (!rgb) {
-                    return false;
-                }
-                var luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
-                return luminance < 0.5;
-            }
-
-            function isLightColor(colorValue) {
-                var rgb = parseColor(colorValue);
-                if (!rgb) {
-                    return false;
-                }
-                var luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
-                return luminance > 0.6;
-            }
-
-            function getExplicitThemeMode(appRoot) {
-                var html = document.documentElement;
-                var body = document.body;
-                var app = appRoot || document.querySelector('.stApp');
-                var markers = [
-                    html && html.getAttribute('data-theme'),
-                    body && body.getAttribute('data-theme'),
-                    app && app.getAttribute('data-theme')
-                ].map(function (value) {
-                    return (value || '').toLowerCase();
-                });
-
-                if (markers.indexOf('dark') >= 0) {
-                    return 'dark';
-                }
-                if (markers.indexOf('light') >= 0) {
-                    return 'light';
-                }
-
-                var classText = [
-                    (html && html.className) || '',
-                    (body && body.className) || '',
-                    (app && app.className) || ''
-                ].join(' ').toLowerCase();
-
-                if (/(^|\s)(theme-dark|dark|st-dark)(\s|$)/.test(classText)) {
-                    return 'dark';
-                }
-                if (/(^|\s)(theme-light|light|st-light)(\s|$)/.test(classText)) {
-                    return 'light';
-                }
-
-                return '';
-            }
-
             function applyTheme() {
                 var appRoot = document.querySelector('.stApp') || document.body;
                 var layouts = document.querySelectorAll('.ninebox-layout');
@@ -835,20 +754,14 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
                 }
 
                 var appBackground = getThemeBackgroundColor(appRoot);
-                var explicitMode = getExplicitThemeMode(appRoot);
 
                 layouts.forEach(function (layout) {
                     var contentContainer = layout.closest('[data-testid="stMarkdownContainer"]') || layout.parentElement || appRoot;
                     var contentText = window.getComputedStyle(contentContainer).color || getThemeTextColor(appRoot);
-                    var darkMode = explicitMode === 'dark' || (explicitMode !== 'light' && (isLightColor(contentText) || isDarkColor(appBackground)));
-                    var boxColor = darkMode ? '#000000' : '#ffffff';
                     layout.style.setProperty('--ninebox-text', contentText);
                     layout.style.setProperty('--ninebox-axis-text', contentText);
                     layout.style.setProperty('--ninebox-bg', appBackground);
-                    layout.style.setProperty('--ninebox-cell-bg', boxColor, 'important');
-                    layout.querySelectorAll('.ninebox-cell').forEach(function (cell) {
-                        cell.style.setProperty('background-color', boxColor, 'important');
-                    });
+                    layout.style.setProperty('--ninebox-cell-bg', appBackground, 'important');
                 });
             }
 
@@ -873,7 +786,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
     )
     st.markdown(
         (
-            "<div class='ninebox-layout' data-ninebox-style='v4'>"
+            "<div class='ninebox-layout' data-ninebox-style='v5'>"
             "<div class='ninebox-y-axis'>"
             "<div class='ninebox-y-axis-rotated ninebox-axis-label-row ninebox-axis-text'>Low&#9;&#9;&#9;&#9;&#9;&#9;&#9;Potential &rarr;&#9;&#9;&#9;&#9;&#9;&#9;&#9;High</div>"
             "</div>"
