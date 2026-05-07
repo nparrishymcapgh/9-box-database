@@ -711,6 +711,53 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
                 return luminance < 0.5;
             }
 
+            function getCssVar(element, name) {
+                if (!element) {
+                    return '';
+                }
+                return (window.getComputedStyle(element).getPropertyValue(name) || '').trim();
+            }
+
+            function firstSolidBackground(elements) {
+                for (var i = 0; i < elements.length; i += 1) {
+                    var el = elements[i];
+                    if (!el) {
+                        continue;
+                    }
+                    var bg = window.getComputedStyle(el).backgroundColor || '';
+                    if (bg && bg !== 'transparent' && bg !== 'rgba(0, 0, 0, 0)') {
+                        return bg;
+                    }
+                }
+                return '#ffffff';
+            }
+
+            function detectDarkMode(appRoot) {
+                var html = document.documentElement;
+                var body = document.body;
+                var rootTheme = (html && html.getAttribute('data-theme') || '').toLowerCase();
+                var appTheme = (appRoot && appRoot.getAttribute('data-theme') || '').toLowerCase();
+                var classText = ((html && html.className) || '') + ' ' + ((body && body.className) || '') + ' ' + ((appRoot && appRoot.className) || '');
+                var classLooksDark = /(^|\s)(dark|theme-dark|st-dark)(\s|$)/i.test(classText);
+
+                if (rootTheme === 'dark' || appTheme === 'dark' || classLooksDark) {
+                    return true;
+                }
+
+                var bg = firstSolidBackground([appRoot, body, html]);
+                return isDarkColor(bg);
+            }
+
+            function getThemeTextColor(appRoot) {
+                var html = document.documentElement;
+                var body = document.body;
+                var cssVar = getCssVar(appRoot, '--text-color') || getCssVar(html, '--text-color') || getCssVar(body, '--text-color');
+                if (cssVar) {
+                    return cssVar;
+                }
+                return window.getComputedStyle(appRoot || body || html).color || '#111827';
+            }
+
             function applyTheme() {
                 var appRoot = document.querySelector('.stApp') || document.body;
                 var layouts = document.querySelectorAll('.ninebox-layout');
@@ -718,10 +765,8 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
                     return;
                 }
 
-                var styles = window.getComputedStyle(appRoot);
-                var appText = styles.color || '#111827';
-                var appBg = styles.backgroundColor || '#ffffff';
-                var dark = isDarkColor(appBg);
+                var appText = getThemeTextColor(appRoot);
+                var dark = detectDarkMode(appRoot);
 
                 layouts.forEach(function (layout) {
                     layout.style.setProperty('--ninebox-text', appText);
