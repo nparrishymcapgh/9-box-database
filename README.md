@@ -99,6 +99,8 @@ streamlit run streamlit_app.py
 - Individual question point values are not shown on the main evaluation screen.
 - The main evaluation screen shows only the level name, performance, and potential while answers are selected.
 - Total points are shown at the bottom of the evaluation screen.
+- The app stores question responses and total score, but does not track per-evaluation no counts.
+- Submitted 9 Box Evaluations renders a full 3x3 nine-box grid before the saved evaluations list, with score 9 in the bottom-left and score 1 in the top-right.
 - Submitted 9 Box Evaluations shows each employee's name, role, location, department, and full level details, including focus, steps, and description.
 - Saved evaluations can be deleted from the Submitted 9 Box Evaluations tab to start over.
 

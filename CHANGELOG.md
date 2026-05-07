@@ -1,5 +1,10 @@
 # Unreleased
 
+- Added a 3x3 nine-box grid to Submitted 9 Box Evaluations so managers can see every rated employee plotted by score before the saved-evaluations list.
+- Stopped storing per-response no counts while preserving the legacy Responses sheet column for compatibility.
+- Added tolerant worksheet loading to handle blank or duplicate Google Sheets headers without crashing startup.
+- Updated the manager evaluation flow to advance to the next pending employee automatically and show a completion message after all assigned employees are reviewed.
+- Expanded submitted evaluation summaries to show employee role, location, and department and moved delete/start-over actions there.
 - Restored the manager workflow title to Succession Planning.
 - Changed 9-box scoring to start from 8 points and removed the visible base-score caption.
 - Removed per-question point labels and yes-no count summaries from the manager evaluation screen.

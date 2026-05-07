@@ -1,4 +1,5 @@
 import json
+import html
 import time
 import uuid
 from datetime import datetime
@@ -402,11 +403,245 @@ def get_resources_for_score(resources_df, score):
         if name and link:
             resources.append({"name": name, "link": link})
     return resources
+
+
 def score_to_9box_rating(total_points):
     try:
         return max(1, min(9, int(float(total_points))))
     except (TypeError, ValueError):
         return None
+
+
+def get_level_name(levels_df, score):
+    level_details = get_level_details(levels_df, score)
+    if level_details is None:
+        return f"Score {score}"
+    return normalize_text(level_details.get("name", "")) or f"Score {score}"
+
+
+def get_manager_employee_row(manager_employees, employee_id):
+    matches = manager_employees[manager_employees["ID"].astype(str).str.strip() == str(employee_id).strip()]
+    if matches.empty:
+        return None
+    return matches.iloc[0]
+
+
+def get_saved_employee_summary(saved_row, manager_employees):
+    employee_id = normalize_text(saved_row.get("employee_id", ""))
+    employee_row = get_manager_employee_row(manager_employees, employee_id)
+    summary_row = employee_row if employee_row is not None else saved_row
+    return {
+        "employee_row": employee_row,
+        "employee_name": get_employee_name(summary_row) or normalize_text(saved_row.get("employee_name", "")),
+        "employee_role": get_employee_role(summary_row) or normalize_text(saved_row.get("job_title", "")),
+        "employee_location": get_employee_location(summary_row) or normalize_text(saved_row.get("branch", "")),
+        "employee_department": get_employee_department(summary_row) or normalize_text(saved_row.get("dept", "")),
+    }
+
+
+def build_9box_grid_cells(saved_evaluations_df, manager_employees, levels_df):
+    cells = {
+        score: {"score": score, "name": get_level_name(levels_df, score), "employees": []}
+        for score in range(1, 10)
+    }
+
+    for _, saved_row in saved_evaluations_df.iterrows():
+        score = score_to_9box_rating(parse_question_points(saved_row.get("questions_score", 0)))
+        if score is None:
+            continue
+
+        employee_summary = get_saved_employee_summary(saved_row, manager_employees)
+        cells[score]["employees"].append(
+            {
+                "name": employee_summary["employee_name"] or "Unnamed employee",
+                "role": employee_summary["employee_role"],
+            }
+        )
+
+    return cells
+
+
+def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
+    grid_order = [3, 2, 1, 6, 5, 4, 9, 8, 7]
+    cells = build_9box_grid_cells(saved_evaluations_df, manager_employees, levels_df)
+    cell_markup = []
+
+    for score in grid_order:
+        cell = cells[score]
+        employee_markup = "".join(
+            (
+                f"<div class='ninebox-employee'>"
+                f"<div class='ninebox-employee-name'>{html.escape(employee['name'])}</div>"
+                f"<div class='ninebox-employee-role'>{html.escape(employee['role'] or 'Role not provided')}</div>"
+                f"</div>"
+            )
+            for employee in cell["employees"]
+        )
+        empty_state = "<div class='ninebox-empty'>No employees</div>" if not employee_markup else ""
+        cell_markup.append(
+            f"<div class='ninebox-cell'>"
+            f"<div class='ninebox-cell-header'>"
+            f"<span class='ninebox-score'>{score}</span>"
+            f"<span class='ninebox-level-name'>{html.escape(cell['name'])}</span>"
+            f"</div>"
+            f"<div class='ninebox-cell-body'>{employee_markup}{empty_state}</div>"
+            f"</div>"
+        )
+
+    st.markdown(
+        """
+        <style>
+        .ninebox-layout {
+            display: grid;
+            grid-template-columns: 72px minmax(0, 1fr);
+            gap: 0.75rem;
+            align-items: stretch;
+            margin: 1rem 0 1.5rem 0;
+        }
+        .ninebox-y-axis {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            color: #4b5563;
+            font-size: 0.9rem;
+        }
+        .ninebox-y-axis-label {
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
+            font-weight: 600;
+            letter-spacing: 0.03em;
+        }
+        .ninebox-axis-note {
+            font-size: 0.78rem;
+            color: #6b7280;
+        }
+        .ninebox-main {
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+            overflow-x: auto;
+        }
+        .ninebox-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.65rem;
+            min-width: 720px;
+        }
+        .ninebox-cell {
+            min-height: 182px;
+            border: 1px solid #d1d5db;
+            border-radius: 14px;
+            padding: 0.85rem;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+        }
+        .ninebox-cell-header {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            margin-bottom: 0.7rem;
+        }
+        .ninebox-score {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 1.7rem;
+            height: 1.7rem;
+            padding: 0 0.35rem;
+            border-radius: 999px;
+            background: #0f172a;
+            color: #ffffff;
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+        .ninebox-level-name {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #0f172a;
+            line-height: 1.2;
+        }
+        .ninebox-cell-body {
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+        }
+        .ninebox-employee {
+            border-radius: 10px;
+            background: #e2e8f0;
+            padding: 0.45rem 0.55rem;
+        }
+        .ninebox-employee-name {
+            color: #111827;
+            font-size: 0.88rem;
+            font-weight: 600;
+            line-height: 1.2;
+        }
+        .ninebox-employee-role {
+            color: #475569;
+            font-size: 0.76rem;
+            margin-top: 0.15rem;
+            line-height: 1.2;
+        }
+        .ninebox-empty {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            font-style: italic;
+        }
+        .ninebox-x-axis {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            align-items: center;
+            color: #4b5563;
+            font-size: 0.85rem;
+            gap: 0.65rem;
+            min-width: 720px;
+        }
+        .ninebox-x-axis-center {
+            text-align: center;
+            font-weight: 600;
+        }
+        .ninebox-x-axis-right {
+            text-align: right;
+        }
+        @media (max-width: 900px) {
+            .ninebox-layout {
+                grid-template-columns: 1fr;
+            }
+            .ninebox-y-axis {
+                flex-direction: row;
+                justify-content: space-between;
+            }
+            .ninebox-y-axis-label {
+                writing-mode: initial;
+                transform: none;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        (
+            "<div class='ninebox-layout'>"
+            "<div class='ninebox-y-axis'>"
+            "<div>High</div>"
+            "<div class='ninebox-y-axis-label'>Potential &uarr;</div>"
+            "<div>Low</div>"
+            "</div>"
+            "<div class='ninebox-main'>"
+            f"<div class='ninebox-grid'>{''.join(cell_markup)}</div>"
+            "<div class='ninebox-x-axis'>"
+            "<div>Low</div>"
+            "<div class='ninebox-x-axis-center'>Performance &rarr;</div>"
+            "<div class='ninebox-x-axis-right'>High</div>"
+            "</div>"
+            "</div>"
+            "</div>"
+        ),
+        unsafe_allow_html=True,
+    )
 
 
 def get_existing_employee_evaluation(responses_df, manager_email, employee_id):
@@ -503,20 +738,15 @@ def calculate_9box_metrics(answers, question_rows, base_points=8):
     }
 
     yes_points = 0
-    yes_count = 0
-    no_count = 0
 
     for question_id, answer in answers.items():
         normalized = normalize_text_lower(answer)
         if normalized == "yes":
-            yes_count += 1
             yes_points += points_lookup.get(str(question_id).strip(), 0)
-        elif normalized == "no":
-            no_count += 1
 
     total_points = base_points + yes_points
     nine_box_rating = max(1, min(9, total_points))
-    return total_points, yes_count, no_count, nine_box_rating
+    return total_points, nine_box_rating
 
 
 def get_manager_sheet_columns(managers_df):
@@ -551,7 +781,7 @@ def validate_manager_credentials(managers_df, email, password):
 
 def create_response_entry(manager_email, manager_name, employee, answers, comments, metrics):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    total_points, _, no_count, _ = metrics
+    total_points, _ = metrics
     employee_id = get_employee_id(employee)
     employee_name = get_employee_name(employee)
     employee_email = get_employee_email(employee)
@@ -572,7 +802,7 @@ def create_response_entry(manager_email, manager_name, employee, answers, commen
         "job_title": employee_role,
         "executive_email": "",
         "questions_score": total_points,
-        "number_of_nos": no_count,
+        "number_of_nos": "",
         "responses": json.dumps(answers),
         "comments": comments.strip(),
         "employee_agree": "",
@@ -757,7 +987,7 @@ with tab_submit:
                 prompt = str(question.get("question", "")).strip()
                 answers[qid] = st.radio(prompt, options=["Yes", "No"], key=f"q_{employee_id}_{qid}")
 
-            total_points, yes_count, no_count, nine_box_rating = calculate_9box_metrics(answers, scoped_questions)
+            total_points, nine_box_rating = calculate_9box_metrics(answers, scoped_questions)
             level_details = get_level_details(levels_df, nine_box_rating)
             comments = st.text_area("Manager comments (optional)", height=120, key=f"comments_{employee_id}")
 
@@ -782,7 +1012,7 @@ with tab_submit:
                     employee,
                     answers,
                     comments,
-                    (total_points, yes_count, no_count, nine_box_rating),
+                    (total_points, nine_box_rating),
                 )
                 append_response(entry)
                 clear_data_caches()
@@ -804,14 +1034,15 @@ with tab_status:
         levels_df = st.session_state.get("levels_df", pd.DataFrame())
         resources_df = st.session_state.get("resources_df", pd.DataFrame())
 
+        st.markdown("#### 9 Box Grid")
+        render_9box_grid(mine, manager_employees, levels_df)
+
         for _, saved_row in mine.iterrows():
-            employee_id = str(saved_row.get("employee_id", "")).strip()
-            employee_row = manager_employees[manager_employees["ID"].astype(str) == employee_id]
-            summary_row = employee_row.iloc[0] if not employee_row.empty else saved_row
-            employee_name = get_employee_name(summary_row) or normalize_text(saved_row.get("employee_name", ""))
-            employee_role = get_employee_role(summary_row) or normalize_text(saved_row.get("job_title", ""))
-            employee_location = get_employee_location(summary_row) or normalize_text(saved_row.get("branch", ""))
-            employee_department = get_employee_department(summary_row) or normalize_text(saved_row.get("dept", ""))
+            employee_summary = get_saved_employee_summary(saved_row, manager_employees)
+            employee_name = employee_summary["employee_name"]
+            employee_role = employee_summary["employee_role"]
+            employee_location = employee_summary["employee_location"]
+            employee_department = employee_summary["employee_department"]
             label = (
                 f"{employee_name}"
                 f" | Role: {employee_role or 'Not provided'}"
@@ -820,8 +1051,8 @@ with tab_status:
             )
 
             question_rows = pd.DataFrame()
-            if not employee_row.empty:
-                question_rows = prepare_9box_questions(st.session_state.questions_df, employee_row.iloc[0])
+            if employee_summary["employee_row"] is not None:
+                question_rows = prepare_9box_questions(st.session_state.questions_df, employee_summary["employee_row"])
 
             with st.expander(label):
                 st.write(
