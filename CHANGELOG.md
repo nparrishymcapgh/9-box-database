@@ -1,3 +1,10 @@
+# Unreleased
+
+- Renamed the manager workflow UI to 9 Box Evaluation.
+- Changed 9-box scoring to start from 8 points and removed the visible base-score caption.
+- Removed per-question point labels and yes-no count summaries from the manager evaluation screen.
+- Added Levels sheet support and a Levels tab, and surfaced the matching level name, performance, and potential during score calculation.
+
 # Changelog
 
 ## 2026-05-06

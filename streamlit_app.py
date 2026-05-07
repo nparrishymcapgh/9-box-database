@@ -13,7 +13,7 @@ from google.oauth2.service_account import Credentials
 # PAGE CONFIG
 # ============================================================================
 st.set_page_config(
-    page_title="Succession Planning",
+    page_title="9 Box Evaluation",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -27,6 +27,7 @@ EMPLOYEES_TAB = "Employees"
 QUESTIONS_TAB = "Questions"
 RESPONSES_TAB = "Responses"
 MANAGERS_TAB = "Managers"
+LEVELS_TAB = "Levels"
 DEFAULT_DATA_SYNC_MINUTES = 5
 
 # Keep legacy response columns for compatibility with existing sheet data.
@@ -155,6 +156,16 @@ def parse_question_points(value):
         return 0
 
 
+def parse_level_score(value):
+    text = normalize_text(value)
+    if not text:
+        return None
+    try:
+        return int(float(text))
+    except ValueError:
+        return None
+
+
 def row_role_matches_question(role_cell, employee_role):
     role_cell_text = normalize_text_lower(role_cell)
     employee_role_text = normalize_text_lower(employee_role)
@@ -200,7 +211,48 @@ def prepare_9box_questions(questions_df, employee_row):
     return normalized.reset_index(drop=True)
 
 
-def calculate_9box_metrics(answers, question_rows, base_points=6):
+def prepare_levels(levels_df):
+    expected_columns = ["score", "performance", "potential", "name", "steps", "focus", "description"]
+    if levels_df.empty:
+        return pd.DataFrame(columns=expected_columns)
+
+    score_column = get_first_matching_column(levels_df, ["score", "rating", "level", "9_box_rating", "nine_box_rating"])
+    performance_column = get_first_matching_column(levels_df, ["performance"])
+    potential_column = get_first_matching_column(levels_df, ["potential"])
+    name_column = get_first_matching_column(levels_df, ["name", "level_name"])
+    steps_column = get_first_matching_column(levels_df, ["steps", "next_steps"])
+    focus_column = get_first_matching_column(levels_df, ["focus", "development_focus"])
+    description_column = get_first_matching_column(levels_df, ["description", "summary"])
+
+    if not score_column:
+        return pd.DataFrame(columns=expected_columns)
+
+    normalized = pd.DataFrame()
+    normalized["score"] = levels_df[score_column].apply(parse_level_score)
+    normalized["performance"] = levels_df[performance_column].astype(str).str.strip() if performance_column else ""
+    normalized["potential"] = levels_df[potential_column].astype(str).str.strip() if potential_column else ""
+    normalized["name"] = levels_df[name_column].astype(str).str.strip() if name_column else ""
+    normalized["steps"] = levels_df[steps_column].astype(str).str.strip() if steps_column else ""
+    normalized["focus"] = levels_df[focus_column].astype(str).str.strip() if focus_column else ""
+    normalized["description"] = levels_df[description_column].astype(str).str.strip() if description_column else ""
+
+    normalized = normalized.dropna(subset=["score"])
+    normalized["score"] = normalized["score"].astype(int)
+    normalized = normalized.drop_duplicates(subset=["score"], keep="first")
+    return normalized.reset_index(drop=True)
+
+
+def get_level_details(levels_df, score):
+    if levels_df.empty:
+        return None
+
+    matches = levels_df[levels_df["score"] == int(score)]
+    if matches.empty:
+        return None
+    return matches.iloc[0]
+
+
+def calculate_9box_metrics(answers, question_rows, base_points=8):
     points_lookup = {
         str(row.get("ID", "")).strip(): parse_question_points(row.get("points", 0))
         for _, row in question_rows.iterrows()
@@ -303,6 +355,7 @@ def sync_session_data():
     st.session_state.employees_df = load_sheet(EMPLOYEES_TAB)
     st.session_state.questions_df = load_sheet(QUESTIONS_TAB)
     st.session_state.managers_df = load_sheet(MANAGERS_TAB)
+    st.session_state.levels_df = prepare_levels(load_sheet(LEVELS_TAB))
     st.session_state.responses_df = load_responses()
     st.session_state.data_loaded = True
     st.session_state.last_data_sync_ts = time.time()
@@ -311,7 +364,7 @@ def sync_session_data():
 # ============================================================================
 # APP UI
 # ============================================================================
-st.title("Succession Planning")
+st.title("9 Box Evaluation")
 
 if "gcp_service_account" not in st.secrets:
     st.error("Google service account credentials not configured.")
@@ -388,10 +441,10 @@ if manager_employees.empty:
     st.warning("No employees are assigned to this manager email in the Employees sheet.")
     st.stop()
 
-tab_submit, tab_status = st.tabs(["Submit 9-Box Rating", "Submitted Ratings"])
+tab_submit, tab_status, tab_levels = st.tabs(["9 Box Evaluation", "Submitted Ratings", "Levels"])
 
 with tab_submit:
-    st.markdown("### Submit a 9-box rating")
+    st.markdown("### Complete a 9 Box Evaluation")
 
     selected_employee_id = st.selectbox(
         "Select employee",
@@ -418,19 +471,36 @@ with tab_submit:
     answers = {}
     for _, question in scoped_questions.iterrows():
         qid = str(question.get("ID", ""))
-        points_value = parse_question_points(question.get("points", 0))
-        prompt = f"{question.get('question', '')} (+{points_value} if Yes)"
+        prompt = str(question.get("question", "")).strip()
         answers[qid] = st.radio(prompt, options=["Yes", "No"], key=f"q_{selected_employee_id}_{qid}")
 
     total_points, yes_count, no_count, nine_box_rating = calculate_9box_metrics(answers, scoped_questions)
+    level_details = get_level_details(st.session_state.get("levels_df", pd.DataFrame()), nine_box_rating)
 
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Total Points", f"{total_points}")
-    m2.metric("9-Box Rating", f"{nine_box_rating}")
-    m3.metric("Yes / No", f"{yes_count} / {no_count}")
-    st.caption("Scoring: start at 6 points, add question points for each Yes answer.")
+    score_col, name_col, performance_col, potential_col = st.columns(4)
+    score_col.metric("9 Box Score", f"{nine_box_rating}")
+    name_col.metric("Level", level_details.get("name", "") if level_details is not None else "")
+    performance_col.metric(
+        "Performance",
+        level_details.get("performance", "") if level_details is not None else "",
+    )
+    potential_col.metric(
+        "Potential",
+        level_details.get("potential", "") if level_details is not None else "",
+    )
+
+    if level_details is not None:
+        if level_details.get("description", ""):
+            st.caption(level_details.get("description", ""))
+        if level_details.get("focus", ""):
+            st.write(f"Focus: {level_details.get('focus', '')}")
+        if level_details.get("steps", ""):
+            st.write(f"Steps: {level_details.get('steps', '')}")
 
     comments = st.text_area("Manager comments (optional)", height=120)
+
+    st.divider()
+    st.metric("Total Points", f"{total_points}")
 
     if st.button("Submit Rating", type="primary"):
         entry = create_response_entry(
@@ -443,7 +513,7 @@ with tab_submit:
         )
         append_response(entry)
         clear_data_caches()
-        st.success("9-box rating submitted.")
+        st.success("9 Box Evaluation submitted.")
         st.rerun()
 
 with tab_status:
@@ -458,7 +528,7 @@ with tab_status:
         mine = mine.sort_values("created_at", ascending=False)
         display_cols = [
             "employee_name", "employee_id", "branch", "dept", "job_title",
-            "questions_score", "number_of_nos", "status", "created_at", "updated_at",
+            "questions_score", "status", "created_at", "updated_at",
         ]
         available = [c for c in display_cols if c in mine.columns]
         df = mine[available].rename(
@@ -469,10 +539,20 @@ with tab_status:
                 "dept": "Dept",
                 "job_title": "Role",
                 "questions_score": "Total Points",
-                "number_of_nos": "No Answers",
                 "status": "Status",
                 "created_at": "Created",
                 "updated_at": "Updated",
             }
         )
         st.dataframe(df, use_container_width=True, hide_index=True)
+
+with tab_levels:
+    st.markdown("### Levels")
+    levels_df = st.session_state.get("levels_df", pd.DataFrame())
+
+    if levels_df.empty:
+        st.info(
+            "No Levels data found. Add a Levels sheet with columns: score, performance, potential, name, steps, focus, description."
+        )
+    else:
+        st.dataframe(levels_df, use_container_width=True, hide_index=True)

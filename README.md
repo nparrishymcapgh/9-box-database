@@ -1,6 +1,6 @@
-# Succession Planning
+# 9 Box Evaluation
 
-This Streamlit app supports manager-only succession planning using a 9-box scoring flow backed by Google Sheets.
+This Streamlit app supports manager-only 9 box evaluations backed by Google Sheets.
 
 ## What the app does
 
@@ -8,8 +8,9 @@ This Streamlit app supports manager-only succession planning using a 9-box scori
 - Shows employees assigned to that manager
 - Loads role-based questions from the Questions tab
 - Scores each employee using:
-  - Start at 6 points
+  - Start at 8 points
   - Add question points for each Yes answer
+- Shows the matching level name, performance, and potential for the calculated score
 - Stores submissions in the Responses tab
 
 ## Required Google Sheet tabs
@@ -18,6 +19,7 @@ This Streamlit app supports manager-only succession planning using a 9-box scori
 - Managers
 - Questions
 - Responses (auto-created if missing)
+- Levels
 
 ## Required columns
 
@@ -51,6 +53,18 @@ Notes:
 - comma-separated role values are supported
 - blank role applies to all roles
 
+### Levels
+
+The Levels tab should include these columns:
+
+- score
+- performance
+- potential
+- name
+- steps
+- focus
+- description
+
 ## Streamlit secrets
 
 Use .streamlit/secrets.toml locally, or Streamlit Cloud Secrets in deployment.
@@ -76,6 +90,12 @@ SMTP is optional now because there is no approval email workflow.
 pip install -r requirements.txt
 streamlit run streamlit_app.py
 ```
+
+## UI behavior
+
+- Individual question point values are not shown on the main evaluation screen.
+- The app shows the calculated 9 box score, level name, performance, and potential while answers are selected.
+- Total points are shown at the bottom of the evaluation screen.
 
 ## Migration note for existing data
 
