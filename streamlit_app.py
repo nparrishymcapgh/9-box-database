@@ -544,27 +544,26 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             --ninebox-empty: color-mix(in srgb, var(--ninebox-text) 52%, transparent);
             --ninebox-cell-bg: var(--background-color, #ffffff);
             display: grid;
-            grid-template-columns: 70px minmax(0, 1fr);
-            gap: 0.15rem;
+            grid-template-columns: 92px minmax(0, 1fr);
+            gap: 0;
             align-items: stretch;
             margin: 1rem 0 1.5rem 0;
         }
         .ninebox-y-axis {
             display: flex;
             align-items: flex-end;
-            justify-content: flex-end;
+            justify-content: center;
             color: var(--ninebox-text);
             min-height: 560px;
-            padding-bottom: 0.55rem;
+            padding-bottom: 0.35rem;
         }
         .ninebox-y-axis-rotated {
-            width: 330px;
+            width: auto;
             transform: rotate(-90deg);
             transform-origin: center;
             display: block;
             text-align: center;
-            white-space: pre;
-            margin-right: -0.3rem;
+            white-space: nowrap;
         }
         .ninebox-axis-label-row {
             color: var(--ninebox-text);
@@ -750,7 +749,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         (
             "<div class='ninebox-layout'>"
             "<div class='ninebox-y-axis'>"
-            "<div class='ninebox-y-axis-rotated ninebox-axis-label-row'>Low&#9;&#9;&#9;&#9;&#9;&#9;&#9;Potential &rarr;&#9;&#9;&#9;&#9;&#9;&#9;&#9;High</div>"
+            "<div class='ninebox-y-axis-rotated ninebox-axis-label-row'>Low&nbsp;&nbsp;&nbsp;Potential &rarr;&nbsp;&nbsp;&nbsp;High</div>"
             "</div>"
             "<div class='ninebox-main'>"
             f"<div class='ninebox-grid'>{''.join(cell_markup)}</div>"
