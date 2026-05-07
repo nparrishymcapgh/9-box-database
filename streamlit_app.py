@@ -93,6 +93,8 @@ def load_sheet(tab_name):
         return read_worksheet_dataframe(worksheet)
     except gspread.exceptions.WorksheetNotFound:
         return pd.DataFrame()
+    except gspread.exceptions.APIError:
+        return pd.DataFrame()
 
 
 def load_first_available_sheet(tab_names):
@@ -137,8 +139,26 @@ def make_unique_headers(headers):
     return normalized_headers
 
 
+def is_retryable_api_error(exc):
+    status_code = getattr(getattr(exc, "response", None), "status_code", None)
+    if status_code is None:
+        return True
+    return int(status_code) in {408, 429, 500, 502, 503, 504}
+
+
+def run_with_sheets_retry(operation, max_attempts=3, base_delay_seconds=0.6):
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return operation()
+        except gspread.exceptions.APIError as exc:
+            last_attempt = attempt == max_attempts
+            if last_attempt or not is_retryable_api_error(exc):
+                raise
+            time.sleep(base_delay_seconds * attempt)
+
+
 def read_worksheet_dataframe(worksheet):
-    values = worksheet.get_all_values()
+    values = run_with_sheets_retry(lambda: worksheet.get_all_values())
     if not values:
         return pd.DataFrame()
 
@@ -178,9 +198,12 @@ def ensure_sheet_headers(worksheet, headers):
 @st.cache_data(ttl=300)
 def load_responses():
     spreadsheet = get_spreadsheet()
-    worksheet = ensure_responses_sheet(spreadsheet)
-    df = read_worksheet_dataframe(worksheet)
-    return ensure_dataframe_columns(normalize_responses_dataframe(df), MANAGER_RESPONSE_COLUMNS)
+    try:
+        worksheet = ensure_responses_sheet(spreadsheet)
+        df = read_worksheet_dataframe(worksheet)
+        return ensure_dataframe_columns(normalize_responses_dataframe(df), MANAGER_RESPONSE_COLUMNS)
+    except gspread.exceptions.APIError:
+        return pd.DataFrame(columns=MANAGER_RESPONSE_COLUMNS)
 
 
 def ensure_responses_sheet(spreadsheet):
