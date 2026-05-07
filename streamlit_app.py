@@ -551,8 +551,8 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         }
         .ninebox-y-axis {
             display: flex;
-            align-items: center;
-            justify-content: center;
+            align-items: flex-start;
+            justify-content: flex-end;
             color: var(--ninebox-text);
             min-height: 560px;
         }
@@ -563,6 +563,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             display: block;
             text-align: center;
             white-space: pre;
+            margin-left: -10ch;
         }
         .ninebox-axis-label-row {
             color: var(--ninebox-text);
