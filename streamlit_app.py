@@ -536,7 +536,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
     st.markdown(
         """
         <style>
-        /* ninebox-style-v3 */
+        /* ninebox-style-v4 */
         .ninebox-layout {
             --ninebox-text: currentColor;
             --ninebox-axis-text: currentColor;
@@ -595,42 +595,8 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             border: 1.5px solid var(--ninebox-border);
             border-radius: 14px;
             padding: 0.85rem;
-            background: #ffffff !important;
+            background: var(--ninebox-cell-bg) !important;
             box-shadow: none;
-        }
-        html[data-theme='dark'] .ninebox-cell,
-        body[data-theme='dark'] .ninebox-cell,
-        .stApp[data-theme='dark'] .ninebox-cell,
-        [data-testid='stAppViewContainer'][data-theme='dark'] .ninebox-cell,
-        html.dark .ninebox-cell,
-        body.dark .ninebox-cell,
-        .stApp.dark .ninebox-cell,
-        html.theme-dark .ninebox-cell,
-        body.theme-dark .ninebox-cell,
-        .stApp.theme-dark .ninebox-cell {
-            background: #000000 !important;
-        }
-        html[data-theme='light'] .ninebox-cell,
-        body[data-theme='light'] .ninebox-cell,
-        .stApp[data-theme='light'] .ninebox-cell,
-        [data-testid='stAppViewContainer'][data-theme='light'] .ninebox-cell,
-        html.light .ninebox-cell,
-        body.light .ninebox-cell,
-        .stApp.light .ninebox-cell,
-        html.theme-light .ninebox-cell,
-        body.theme-light .ninebox-cell,
-        .stApp.theme-light .ninebox-cell {
-            background: #ffffff !important;
-        }
-        @media (prefers-color-scheme: dark) {
-            .ninebox-cell {
-                background: #000000 !important;
-            }
-        }
-        @media (prefers-color-scheme: light) {
-            .ninebox-cell {
-                background: #ffffff !important;
-            }
         }
         .ninebox-cell-header {
             display: flex;
@@ -723,7 +689,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         """
         <script>
         (function () {
-            var SCRIPT_VERSION = 'ninebox-theme-v2';
+            var SCRIPT_VERSION = 'ninebox-theme-v3';
 
             if (
                 window.__nineboxThemeSyncInitialized
@@ -826,6 +792,41 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
                 return luminance > 0.6;
             }
 
+            function getExplicitThemeMode(appRoot) {
+                var html = document.documentElement;
+                var body = document.body;
+                var app = appRoot || document.querySelector('.stApp');
+                var markers = [
+                    html && html.getAttribute('data-theme'),
+                    body && body.getAttribute('data-theme'),
+                    app && app.getAttribute('data-theme')
+                ].map(function (value) {
+                    return (value || '').toLowerCase();
+                });
+
+                if (markers.indexOf('dark') >= 0) {
+                    return 'dark';
+                }
+                if (markers.indexOf('light') >= 0) {
+                    return 'light';
+                }
+
+                var classText = [
+                    (html && html.className) || '',
+                    (body && body.className) || '',
+                    (app && app.className) || ''
+                ].join(' ').toLowerCase();
+
+                if (/(^|\s)(theme-dark|dark|st-dark)(\s|$)/.test(classText)) {
+                    return 'dark';
+                }
+                if (/(^|\s)(theme-light|light|st-light)(\s|$)/.test(classText)) {
+                    return 'light';
+                }
+
+                return '';
+            }
+
             function applyTheme() {
                 var appRoot = document.querySelector('.stApp') || document.body;
                 var layouts = document.querySelectorAll('.ninebox-layout');
@@ -834,15 +835,20 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
                 }
 
                 var appBackground = getThemeBackgroundColor(appRoot);
+                var explicitMode = getExplicitThemeMode(appRoot);
 
                 layouts.forEach(function (layout) {
                     var contentContainer = layout.closest('[data-testid="stMarkdownContainer"]') || layout.parentElement || appRoot;
                     var contentText = window.getComputedStyle(contentContainer).color || getThemeTextColor(appRoot);
-                    var darkMode = isLightColor(contentText) || isDarkColor(appBackground);
+                    var darkMode = explicitMode === 'dark' || (explicitMode !== 'light' && (isLightColor(contentText) || isDarkColor(appBackground)));
+                    var boxColor = darkMode ? '#000000' : '#ffffff';
                     layout.style.setProperty('--ninebox-text', contentText);
                     layout.style.setProperty('--ninebox-axis-text', contentText);
                     layout.style.setProperty('--ninebox-bg', appBackground);
-                    layout.style.setProperty('--ninebox-cell-bg', darkMode ? '#000000' : '#ffffff', 'important');
+                    layout.style.setProperty('--ninebox-cell-bg', boxColor, 'important');
+                    layout.querySelectorAll('.ninebox-cell').forEach(function (cell) {
+                        cell.style.setProperty('background-color', boxColor, 'important');
+                    });
                 });
             }
 
@@ -867,7 +873,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
     )
     st.markdown(
         (
-            "<div class='ninebox-layout' data-ninebox-style='v3'>"
+            "<div class='ninebox-layout' data-ninebox-style='v4'>"
             "<div class='ninebox-y-axis'>"
             "<div class='ninebox-y-axis-rotated ninebox-axis-label-row ninebox-axis-text'>Low&#9;&#9;&#9;&#9;&#9;&#9;&#9;Potential &rarr;&#9;&#9;&#9;&#9;&#9;&#9;&#9;High</div>"
             "</div>"
