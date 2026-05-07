@@ -689,7 +689,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         """
         <script>
         (function () {
-            var SCRIPT_VERSION = 'ninebox-theme-v4';
+            var SCRIPT_VERSION = 'ninebox-theme-v5';
 
             if (
                 window.__nineboxThemeSyncInitialized
@@ -705,63 +705,86 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
                 window.__nineboxThemeObserver.disconnect();
             }
 
-            function getCssVar(element, name) {
-                if (!element) {
-                    return '';
+            /* Parse rgb/rgba/hex -> {r,g,b} or null */
+            function parseRgb(color) {
+                var m = (color || '').match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+                if (m) { return { r: +m[1], g: +m[2], b: +m[3] }; }
+                var h = (color || '').match(/^#([0-9a-f]{3,6})$/i);
+                if (h) {
+                    var s = h[1].length === 3
+                        ? h[1].split('').map(function(c){ return c+c; }).join('')
+                        : h[1];
+                    return {
+                        r: parseInt(s.slice(0,2),16),
+                        g: parseInt(s.slice(2,4),16),
+                        b: parseInt(s.slice(4,6),16)
+                    };
                 }
-                return (window.getComputedStyle(element).getPropertyValue(name) || '').trim();
+                return null;
             }
 
-            function firstSolidBackground(elements) {
-                for (var i = 0; i < elements.length; i += 1) {
-                    var el = elements[i];
-                    if (!el) {
-                        continue;
-                    }
+            function luminance(color) {
+                var rgb = parseRgb(color);
+                if (!rgb) { return -1; }
+                return (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+            }
+
+            /*
+             * Walk UP the real DOM from startEl to find the first ancestor
+             * (including startEl itself) that has a non-transparent
+             * background-color. This bypasses CSS-variable resolution issues
+             * and always gives the actual rendered background.
+             */
+            function resolvedBackground(startEl) {
+                var el = startEl;
+                while (el && el !== document.documentElement.parentElement) {
                     var bg = window.getComputedStyle(el).backgroundColor || '';
                     if (bg && bg !== 'transparent' && bg !== 'rgba(0, 0, 0, 0)') {
                         return bg;
+                    }
+                    el = el.parentElement;
+                }
+                /* Absolute fallback: check html then body inline style */
+                var checks = [document.documentElement, document.body];
+                for (var i = 0; i < checks.length; i++) {
+                    var bg2 = window.getComputedStyle(checks[i]).backgroundColor || '';
+                    if (bg2 && bg2 !== 'transparent' && bg2 !== 'rgba(0, 0, 0, 0)') {
+                        return bg2;
                     }
                 }
                 return '#ffffff';
             }
 
-            function getThemeTextColor(appRoot) {
-                var html = document.documentElement;
-                var body = document.body;
-                var cssVar = getCssVar(appRoot, '--text-color') || getCssVar(html, '--text-color') || getCssVar(body, '--text-color');
-                if (cssVar) {
-                    return cssVar;
+            function resolvedTextColor(startEl) {
+                var el = startEl;
+                while (el && el !== document.documentElement.parentElement) {
+                    var c = window.getComputedStyle(el).color || '';
+                    var lum = luminance(c);
+                    /* skip colors that are effectively invisible (fully transparent proxy) */
+                    if (lum >= 0) { return c; }
+                    el = el.parentElement;
                 }
-                return window.getComputedStyle(appRoot || body || html).color || '#111827';
-            }
-
-            function getThemeBackgroundColor(appRoot) {
-                var html = document.documentElement;
-                var body = document.body;
-                var cssVar = getCssVar(appRoot, '--background-color') || getCssVar(html, '--background-color') || getCssVar(body, '--background-color');
-                if (cssVar) {
-                    return cssVar;
-                }
-                return firstSolidBackground([appRoot, body, html]);
+                return '#111827';
             }
 
             function applyTheme() {
-                var appRoot = document.querySelector('.stApp') || document.body;
                 var layouts = document.querySelectorAll('.ninebox-layout');
-                if (!appRoot || !layouts.length) {
-                    return;
-                }
-
-                var appBackground = getThemeBackgroundColor(appRoot);
+                if (!layouts.length) { return; }
 
                 layouts.forEach(function (layout) {
-                    var contentContainer = layout.closest('[data-testid="stMarkdownContainer"]') || layout.parentElement || appRoot;
-                    var contentText = window.getComputedStyle(contentContainer).color || getThemeTextColor(appRoot);
-                    layout.style.setProperty('--ninebox-text', contentText);
-                    layout.style.setProperty('--ninebox-axis-text', contentText);
-                    layout.style.setProperty('--ninebox-bg', appBackground);
-                    layout.style.setProperty('--ninebox-cell-bg', appBackground, 'important');
+                    var bg = resolvedBackground(layout);
+                    var fg = resolvedTextColor(layout);
+                    var isDark = luminance(bg) < 0.5;
+                    var cellBg = isDark ? '#000000' : '#ffffff';
+
+                    layout.style.setProperty('--ninebox-text', fg);
+                    layout.style.setProperty('--ninebox-axis-text', fg);
+                    layout.style.setProperty('--ninebox-bg', bg);
+                    layout.style.setProperty('--ninebox-cell-bg', cellBg);
+
+                    layout.querySelectorAll('.ninebox-cell').forEach(function (cell) {
+                        cell.style.backgroundColor = cellBg;
+                    });
                 });
             }
 
@@ -770,7 +793,16 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             window.__nineboxThemeSyncVersion = SCRIPT_VERSION;
             applyTheme();
 
-            var observer = new MutationObserver(applyTheme);
+            var observer = new MutationObserver(function(mutations) {
+                /* Only re-run if a background or class changed — avoids thrash */
+                for (var i = 0; i < mutations.length; i++) {
+                    var t = mutations[i].target;
+                    if (t && t.querySelectorAll) {
+                        applyTheme();
+                        return;
+                    }
+                }
+            });
             observer.observe(document.documentElement, {
                 subtree: true,
                 attributes: true,
@@ -786,7 +818,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
     )
     st.markdown(
         (
-            "<div class='ninebox-layout' data-ninebox-style='v5'>"
+            "<div class='ninebox-layout' data-ninebox-style='v6'>"
             "<div class='ninebox-y-axis'>"
             "<div class='ninebox-y-axis-rotated ninebox-axis-label-row ninebox-axis-text'>Low&#9;&#9;&#9;&#9;&#9;&#9;&#9;Potential &rarr;&#9;&#9;&#9;&#9;&#9;&#9;&#9;High</div>"
             "</div>"
