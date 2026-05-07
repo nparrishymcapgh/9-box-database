@@ -572,6 +572,9 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             font-weight: 700;
             text-shadow: 0 0 0.01px currentColor;
         }
+        .ninebox-axis-text {
+            color: var(--ninebox-axis-text) !important;
+        }
         .ninebox-main {
             display: flex;
             flex-direction: column;
@@ -769,9 +772,14 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
                 var dark = detectDarkMode(appRoot);
 
                 layouts.forEach(function (layout) {
+                    var axisText = dark ? '#ffffff' : '#111827';
+                    var axisLabels = layout.querySelectorAll('.ninebox-axis-text');
                     layout.style.setProperty('--ninebox-text', appText);
-                    layout.style.setProperty('--ninebox-axis-text', dark ? '#ffffff' : appText);
+                    layout.style.setProperty('--ninebox-axis-text', axisText);
                     layout.style.setProperty('--ninebox-cell-bg', dark ? '#000000' : '#ffffff');
+                    axisLabels.forEach(function (label) {
+                        label.style.setProperty('color', axisText, 'important');
+                    });
                 });
             }
 
@@ -796,14 +804,14 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         (
             "<div class='ninebox-layout'>"
             "<div class='ninebox-y-axis'>"
-            "<div class='ninebox-y-axis-rotated ninebox-axis-label-row'>Low&#9;&#9;&#9;&#9;&#9;&#9;&#9;Potential &rarr;&#9;&#9;&#9;&#9;&#9;&#9;&#9;High</div>"
+            "<div class='ninebox-y-axis-rotated ninebox-axis-label-row ninebox-axis-text'>Low&#9;&#9;&#9;&#9;&#9;&#9;&#9;Potential &rarr;&#9;&#9;&#9;&#9;&#9;&#9;&#9;High</div>"
             "</div>"
             "<div class='ninebox-main'>"
             f"<div class='ninebox-grid'>{''.join(cell_markup)}</div>"
             "<div class='ninebox-x-axis'>"
-            "<div class='ninebox-axis-label-row'>Low</div>"
-            "<div class='ninebox-x-axis-center'>Performance &rarr;</div>"
-            "<div class='ninebox-axis-label-row ninebox-x-axis-right'>High</div>"
+            "<div class='ninebox-axis-label-row ninebox-axis-text'>Low</div>"
+            "<div class='ninebox-x-axis-center ninebox-axis-text'>Performance &rarr;</div>"
+            "<div class='ninebox-axis-label-row ninebox-x-axis-right ninebox-axis-text'>High</div>"
             "</div>"
             "</div>"
             "</div>"
