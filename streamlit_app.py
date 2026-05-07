@@ -560,8 +560,8 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             width: 330px;
             transform: rotate(-90deg);
             transform-origin: center;
-            grid-template-columns: 0.7fr 1fr 0.7fr;
-            gap: 0.32rem;
+            grid-template-columns: 0.47fr 1fr 0.47fr;
+            gap: 0.21rem;
         }
         .ninebox-axis-label-row {
             color: var(--ninebox-text);
@@ -673,6 +673,73 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             }
         }
         </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        """
+        <script>
+        (function () {
+            if (window.__nineboxThemeSyncInitialized) {
+                if (typeof window.__nineboxApplyTheme === "function") {
+                    window.__nineboxApplyTheme();
+                }
+                return;
+            }
+
+            function parseRgb(colorValue) {
+                var match = (colorValue || "").match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/i);
+                if (!match) {
+                    return null;
+                }
+                return {
+                    r: Number(match[1]),
+                    g: Number(match[2]),
+                    b: Number(match[3])
+                };
+            }
+
+            function isDarkColor(colorValue) {
+                var rgb = parseRgb(colorValue);
+                if (!rgb) {
+                    return false;
+                }
+                var luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+                return luminance < 0.5;
+            }
+
+            function applyTheme() {
+                var appRoot = document.querySelector('.stApp') || document.body;
+                var layouts = document.querySelectorAll('.ninebox-layout');
+                if (!appRoot || !layouts.length) {
+                    return;
+                }
+
+                var styles = window.getComputedStyle(appRoot);
+                var appText = styles.color || '#111827';
+                var appBg = styles.backgroundColor || '#ffffff';
+                var dark = isDarkColor(appBg);
+
+                layouts.forEach(function (layout) {
+                    layout.style.setProperty('--ninebox-text', appText);
+                    layout.style.setProperty('--ninebox-cell-bg', dark ? '#000000' : '#ffffff');
+                });
+            }
+
+            window.__nineboxApplyTheme = applyTheme;
+            window.__nineboxThemeSyncInitialized = true;
+            applyTheme();
+
+            var observer = new MutationObserver(applyTheme);
+            observer.observe(document.documentElement, {
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['class', 'style', 'data-theme']
+            });
+
+            window.addEventListener('resize', applyTheme);
+        })();
+        </script>
         """,
         unsafe_allow_html=True,
     )
