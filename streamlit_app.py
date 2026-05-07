@@ -560,8 +560,8 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             width: 330px;
             transform: rotate(-90deg);
             transform-origin: center;
-            grid-template-columns: 0.47fr 1fr 0.47fr;
-            gap: 0.21rem;
+            grid-template-columns: 0.24fr 1fr 0.24fr;
+            gap: 0.1rem;
         }
         .ninebox-axis-label-row {
             color: var(--ninebox-text);
