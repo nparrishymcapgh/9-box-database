@@ -1210,8 +1210,6 @@ with tab_submit:
 
 with tab_status:
     st.markdown("### Submitted 9 Box Evaluations")
-    show_indirect_reports = st.toggle("Show Indirect Reports", value=True, key="show_indirect_reports")
-
     descendant_ids = {
         normalize_text(get_employee_id(row))
         for _, row in all_manager_employees.iterrows()
@@ -1223,10 +1221,7 @@ with tab_status:
         if normalize_text(get_employee_id(row))
     }
 
-    visible_employee_ids = descendant_ids if show_indirect_reports else direct_report_ids
-    visible_employee_scope = all_manager_employees if show_indirect_reports else direct_manager_employees
-
-    mine = responses_df[responses_df["employee_id"].astype(str).str.strip().isin(visible_employee_ids)].copy()
+    mine = responses_df[responses_df["employee_id"].astype(str).str.strip().isin(descendant_ids)].copy()
 
     latest_eval_by_employee = get_latest_evaluations_by_employee(mine)
     team_rows = []
@@ -1259,17 +1254,22 @@ with tab_status:
         else:
             st.info("No employees found in your team hierarchy.")
 
-    if mine.empty:
+    levels_df = st.session_state.get("levels_df", pd.DataFrame())
+    resources_df = st.session_state.get("resources_df", pd.DataFrame())
+
+    st.markdown("#### 9 Box Grid")
+    show_indirect_reports = st.toggle("Show Indirect Reports", value=True, key="show_indirect_reports")
+    visible_employee_ids = descendant_ids if show_indirect_reports else direct_report_ids
+    visible_employee_scope = all_manager_employees if show_indirect_reports else direct_manager_employees
+    visible_mine = mine[mine["employee_id"].astype(str).str.strip().isin(visible_employee_ids)].copy()
+
+    if visible_mine.empty:
         st.info("No ratings submitted yet for the currently visible employee scope.")
     else:
-        mine = mine.sort_values("created_at", ascending=False)
-        levels_df = st.session_state.get("levels_df", pd.DataFrame())
-        resources_df = st.session_state.get("resources_df", pd.DataFrame())
+        visible_mine = visible_mine.sort_values("created_at", ascending=False)
+        render_9box_grid(visible_mine, visible_employee_scope, levels_df)
 
-        st.markdown("#### 9 Box Grid")
-        render_9box_grid(mine, visible_employee_scope, levels_df)
-
-        for _, saved_row in mine.iterrows():
+        for _, saved_row in visible_mine.iterrows():
             employee_summary = get_saved_employee_summary(saved_row, visible_employee_scope)
             employee_id = employee_summary["employee_id"]
             employee_name = employee_summary["employee_name"]
