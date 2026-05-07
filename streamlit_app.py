@@ -31,6 +31,8 @@ MANAGERS_TAB = "Managers"
 LEVELS_TAB = "Levels"
 RESOURCE_TABS = ["Resource", "Resources"]
 DEFAULT_DATA_SYNC_MINUTES = 5
+LOCKED_SCORE_QUESTION_ID = "64"
+LOCKED_SCORE_VALUE = 3
 
 # Responses sheet now stores only the fields used by the manager workflow.
 MANAGER_RESPONSE_COLUMNS = [
@@ -275,6 +277,8 @@ def row_role_matches_question(role_cell, employee_role):
         return False
 
     role_tokens = [token.strip() for token in role_cell_text.replace("|", ",").split(",") if token.strip()]
+    if "all" in role_tokens:
+        return True
     return employee_role_text in role_tokens
 
 
@@ -823,6 +827,10 @@ def render_saved_evaluation_details(saved_row, levels_df, resources_df, question
 
 
 def calculate_9box_metrics(answers, question_rows, base_points=8):
+    lock_answer = normalize_text_lower(answers.get(LOCKED_SCORE_QUESTION_ID, ""))
+    if lock_answer == "yes":
+        return LOCKED_SCORE_VALUE, LOCKED_SCORE_VALUE
+
     points_lookup = {
         str(row.get("ID", "")).strip(): parse_question_points(row.get("points", 0))
         for _, row in question_rows.iterrows()
@@ -1064,7 +1072,13 @@ with tab_submit:
             for _, question in scoped_questions.iterrows():
                 qid = str(question.get("ID", "")).strip()
                 prompt = str(question.get("question", "")).strip()
-                answers[qid] = st.radio(prompt, options=["Yes", "No"], key=f"q_{employee_id}_{qid}")
+                default_index = 1 if qid == LOCKED_SCORE_QUESTION_ID else 0
+                answers[qid] = st.radio(
+                    prompt,
+                    options=["Yes", "No"],
+                    index=default_index,
+                    key=f"q_{employee_id}_{qid}",
+                )
 
             total_points, nine_box_rating = calculate_9box_metrics(answers, scoped_questions)
             level_details = get_level_details(levels_df, nine_box_rating)
