@@ -537,29 +537,42 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         """
         <style>
         .ninebox-layout {
+            --ninebox-text: #111827;
+            --ninebox-border: color-mix(in srgb, var(--ninebox-text) 28%, transparent);
+            --ninebox-soft-border: color-mix(in srgb, var(--ninebox-text) 18%, transparent);
+            --ninebox-muted: color-mix(in srgb, var(--ninebox-text) 76%, transparent);
+            --ninebox-empty: color-mix(in srgb, var(--ninebox-text) 52%, transparent);
+            --ninebox-cell-bg: color-mix(in srgb, var(--background-color, #ffffff) 90%, transparent);
             display: grid;
             grid-template-columns: 96px minmax(0, 1fr);
             gap: 0.75rem;
             align-items: stretch;
             margin: 1rem 0 1.5rem 0;
         }
+        [data-theme="dark"] .ninebox-layout,
+        html[data-theme="dark"] .ninebox-layout,
+        .stApp[data-theme="dark"] .ninebox-layout {
+            --ninebox-text: #ffffff;
+            --ninebox-border: color-mix(in srgb, #ffffff 38%, transparent);
+            --ninebox-soft-border: color-mix(in srgb, #ffffff 22%, transparent);
+            --ninebox-muted: color-mix(in srgb, #ffffff 82%, transparent);
+            --ninebox-empty: color-mix(in srgb, #ffffff 62%, transparent);
+            --ninebox-cell-bg: #000000;
+        }
         .ninebox-y-axis {
             display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            align-items: stretch;
-            gap: 0.5rem;
-            color: var(--text-color, #111827);
-            font-size: 1rem;
+            align-items: center;
+            justify-content: center;
+            color: var(--ninebox-text);
             min-height: 560px;
         }
-        .ninebox-y-axis-label {
-            font-weight: 700;
-            letter-spacing: 0.03em;
-            text-align: left;
+        .ninebox-y-axis-rotated {
+            width: 560px;
+            transform: rotate(-90deg);
+            transform-origin: center;
         }
         .ninebox-axis-label-row {
-            color: var(--text-color, #111827);
+            color: var(--ninebox-text);
             font-size: 1.05rem;
             font-weight: 700;
             text-shadow: 0 0 0.01px currentColor;
@@ -578,10 +591,10 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         }
         .ninebox-cell {
             min-height: 182px;
-            border: 1.5px solid color-mix(in srgb, var(--text-color, #111827) 28%, transparent);
+            border: 1.5px solid var(--ninebox-border);
             border-radius: 14px;
             padding: 0.85rem;
-            background: color-mix(in srgb, var(--background-color, #ffffff) 90%, transparent);
+            background: var(--ninebox-cell-bg);
             box-shadow: none;
         }
         .ninebox-cell-header {
@@ -598,16 +611,16 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             height: 1.7rem;
             padding: 0 0.35rem;
             border-radius: 999px;
-            border: 1.5px solid var(--text-color, #111827);
+            border: 1.5px solid var(--ninebox-text);
             background: transparent;
-            color: var(--text-color, #111827);
+            color: var(--ninebox-text);
             font-size: 0.82rem;
             font-weight: 700;
         }
         .ninebox-level-name {
             font-size: 0.95rem;
             font-weight: 600;
-            color: var(--text-color, #111827);
+            color: var(--ninebox-text);
             line-height: 1.2;
         }
         .ninebox-cell-body {
@@ -617,24 +630,24 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         }
         .ninebox-employee {
             border-radius: 10px;
-            border: 1px solid color-mix(in srgb, var(--text-color, #111827) 18%, transparent);
+            border: 1px solid var(--ninebox-soft-border);
             background: transparent;
             padding: 0.45rem 0.55rem;
         }
         .ninebox-employee-name {
-            color: var(--text-color, #111827);
+            color: var(--ninebox-text);
             font-size: 0.88rem;
             font-weight: 600;
             line-height: 1.2;
         }
         .ninebox-employee-role {
-            color: color-mix(in srgb, var(--text-color, #111827) 76%, transparent);
+            color: var(--ninebox-muted);
             font-size: 0.76rem;
             margin-top: 0.15rem;
             line-height: 1.2;
         }
         .ninebox-empty {
-            color: color-mix(in srgb, var(--text-color, #111827) 52%, transparent);
+            color: var(--ninebox-empty);
             font-size: 0.8rem;
             font-style: italic;
         }
@@ -642,7 +655,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             align-items: center;
-            color: var(--text-color, #111827);
+            color: var(--ninebox-text);
             font-size: 1.05rem;
             gap: 0.65rem;
             min-width: 720px;
@@ -660,6 +673,11 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             }
             .ninebox-y-axis {
                 min-height: auto;
+                justify-content: flex-start;
+            }
+            .ninebox-y-axis-rotated {
+                width: 100%;
+                transform: none;
             }
         }
         </style>
@@ -670,9 +688,11 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         (
             "<div class='ninebox-layout'>"
             "<div class='ninebox-y-axis'>"
-            "<div class='ninebox-axis-label-row'>High</div>"
-            "<div class='ninebox-y-axis-label'>Potential &uarr;</div>"
+            "<div class='ninebox-x-axis ninebox-y-axis-rotated'>"
             "<div class='ninebox-axis-label-row'>Low</div>"
+            "<div class='ninebox-x-axis-center'>Potential &rarr;</div>"
+            "<div class='ninebox-axis-label-row ninebox-x-axis-right'>High</div>"
+            "</div>"
             "</div>"
             "<div class='ninebox-main'>"
             f"<div class='ninebox-grid'>{''.join(cell_markup)}</div>"
