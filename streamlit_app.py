@@ -538,6 +538,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         <style>
         .ninebox-layout {
             --ninebox-text: var(--text-color, #111827);
+            --ninebox-axis-text: var(--text-color, #111827);
             --ninebox-border: color-mix(in srgb, var(--ninebox-text) 28%, transparent);
             --ninebox-soft-border: color-mix(in srgb, var(--ninebox-text) 18%, transparent);
             --ninebox-muted: color-mix(in srgb, var(--ninebox-text) 76%, transparent);
@@ -553,7 +554,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             display: flex;
             align-items: center;
             justify-content: center;
-            color: var(--text-color, var(--ninebox-text));
+            color: var(--ninebox-axis-text);
             min-height: 560px;
             padding-bottom: 0;
         }
@@ -566,7 +567,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             white-space: pre;
         }
         .ninebox-axis-label-row {
-            color: var(--text-color, var(--ninebox-text));
+            color: var(--ninebox-axis-text);
             font-size: 1.05rem;
             font-weight: 700;
             text-shadow: 0 0 0.01px currentColor;
@@ -649,7 +650,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             align-items: center;
-            color: var(--text-color, var(--ninebox-text));
+            color: var(--ninebox-axis-text);
             font-size: 1.05rem;
             gap: 0.65rem;
             min-width: 720px;
@@ -724,6 +725,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
 
                 layouts.forEach(function (layout) {
                     layout.style.setProperty('--ninebox-text', appText);
+                    layout.style.setProperty('--ninebox-axis-text', dark ? '#ffffff' : appText);
                     layout.style.setProperty('--ninebox-cell-bg', dark ? '#000000' : '#ffffff');
                 });
             }
