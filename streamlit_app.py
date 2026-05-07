@@ -544,17 +544,18 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             --ninebox-empty: color-mix(in srgb, var(--ninebox-text) 52%, transparent);
             --ninebox-cell-bg: var(--background-color, #ffffff);
             display: grid;
-            grid-template-columns: 96px minmax(0, 1fr);
-            gap: 0.75rem;
+            grid-template-columns: 70px minmax(0, 1fr);
+            gap: 0.15rem;
             align-items: stretch;
             margin: 1rem 0 1.5rem 0;
         }
         .ninebox-y-axis {
             display: flex;
-            align-items: center;
+            align-items: flex-end;
             justify-content: flex-end;
             color: var(--ninebox-text);
             min-height: 560px;
+            padding-bottom: 0.55rem;
         }
         .ninebox-y-axis-rotated {
             width: 330px;
@@ -563,6 +564,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             display: block;
             text-align: center;
             white-space: pre;
+            margin-right: -0.3rem;
         }
         .ninebox-axis-label-row {
             color: var(--ninebox-text);
