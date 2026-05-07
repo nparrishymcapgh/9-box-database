@@ -32,15 +32,29 @@ LEVELS_TAB = "Levels"
 RESOURCE_TABS = ["Resource", "Resources"]
 DEFAULT_DATA_SYNC_MINUTES = 5
 
-# Keep legacy response columns for compatibility with existing sheet data.
+# Responses sheet now stores only the fields used by the manager workflow.
 MANAGER_RESPONSE_COLUMNS = [
     "response_id", "created_at", "updated_at", "manager_email", "manager_name",
-    "employee_id", "employee_name", "employee_email", "branch", "dept",
-    "job_title", "executive_email", "questions_score", "number_of_nos",
-    "responses", "comments", "employee_agree", "manager_agree", "executive_agree",
-    "employee_agree_ts", "manager_agree_ts", "executive_agree_ts",
-    "status", "employee_token", "manager_token", "executive_token",
+    "employee_id", "employee_name", "employee_email", "location", "department",
+    "job_name", "questions_score", "responses", "comments",
 ]
+
+RESPONSE_COLUMN_ALIASES = {
+    "response_id": ["response_id"],
+    "created_at": ["created_at"],
+    "updated_at": ["updated_at"],
+    "manager_email": ["manager_email"],
+    "manager_name": ["manager_name"],
+    "employee_id": ["employee_id"],
+    "employee_name": ["employee_name"],
+    "employee_email": ["employee_email"],
+    "location": ["location", "branch"],
+    "department": ["department", "dept"],
+    "job_name": ["job_name", "job_title", "role"],
+    "questions_score": ["questions_score"],
+    "responses": ["responses"],
+    "comments": ["comments"],
+}
 
 
 # ============================================================================
@@ -90,6 +104,17 @@ def ensure_dataframe_columns(df, expected_columns):
         if col not in df.columns:
             df[col] = ""
     return df
+
+
+def normalize_responses_dataframe(df):
+    if df.empty:
+        return pd.DataFrame(columns=MANAGER_RESPONSE_COLUMNS)
+
+    normalized = pd.DataFrame()
+    for column in MANAGER_RESPONSE_COLUMNS:
+        aliases = RESPONSE_COLUMN_ALIASES.get(column, [column])
+        normalized[column] = df.apply(lambda row: get_row_value(row, aliases), axis=1)
+    return normalized.fillna("")
 
 
 def make_unique_headers(headers):
@@ -148,7 +173,7 @@ def load_responses():
     spreadsheet = get_spreadsheet()
     worksheet = ensure_responses_sheet(spreadsheet)
     df = read_worksheet_dataframe(worksheet)
-    return ensure_dataframe_columns(df, MANAGER_RESPONSE_COLUMNS)
+    return ensure_dataframe_columns(normalize_responses_dataframe(df), MANAGER_RESPONSE_COLUMNS)
 
 
 def ensure_responses_sheet(spreadsheet):
@@ -158,6 +183,20 @@ def ensure_responses_sheet(spreadsheet):
         worksheet = spreadsheet.add_worksheet(RESPONSES_TAB, rows=1000, cols=len(MANAGER_RESPONSE_COLUMNS))
         worksheet.append_row(MANAGER_RESPONSE_COLUMNS)
         return worksheet
+
+    existing_headers = make_unique_headers(worksheet.row_values(1))
+    if existing_headers != MANAGER_RESPONSE_COLUMNS:
+        existing_df = read_worksheet_dataframe(worksheet)
+        normalized_df = normalize_responses_dataframe(existing_df)
+        rows = [MANAGER_RESPONSE_COLUMNS] + normalized_df[MANAGER_RESPONSE_COLUMNS].astype(str).values.tolist()
+        worksheet.clear()
+        worksheet.resize(rows=max(len(rows), 1), cols=len(MANAGER_RESPONSE_COLUMNS))
+        worksheet.update(
+            f"A1:{column_letter(len(MANAGER_RESPONSE_COLUMNS))}{len(rows)}",
+            rows,
+        )
+        return worksheet
+
     return ensure_sheet_headers(worksheet, MANAGER_RESPONSE_COLUMNS)
 
 
@@ -275,6 +314,10 @@ def get_employee_email(employee_row):
 
 def get_employee_role(employee_row):
     return get_row_value(employee_row, ["role", "job_name", "job_title"])
+
+
+def get_employee_job_name(employee_row):
+    return get_row_value(employee_row, ["job_name", "job_title", "role"])
 
 
 def get_employee_location(employee_row):
@@ -431,11 +474,13 @@ def get_saved_employee_summary(saved_row, manager_employees):
     employee_row = get_manager_employee_row(manager_employees, employee_id)
     summary_row = employee_row if employee_row is not None else saved_row
     return {
+        "employee_id": employee_id,
         "employee_row": employee_row,
         "employee_name": get_employee_name(summary_row) or normalize_text(saved_row.get("employee_name", "")),
-        "employee_role": get_employee_role(summary_row) or normalize_text(saved_row.get("job_title", "")),
-        "employee_location": get_employee_location(summary_row) or normalize_text(saved_row.get("branch", "")),
-        "employee_department": get_employee_department(summary_row) or normalize_text(saved_row.get("dept", "")),
+        "employee_role": get_employee_role(summary_row) or normalize_text(saved_row.get("role", "")),
+        "employee_job_name": get_employee_job_name(summary_row) or normalize_text(saved_row.get("job_name", saved_row.get("job_title", ""))),
+        "employee_location": get_employee_location(summary_row) or normalize_text(saved_row.get("location", saved_row.get("branch", ""))),
+        "employee_department": get_employee_department(summary_row) or normalize_text(saved_row.get("department", saved_row.get("dept", ""))),
     }
 
 
@@ -454,7 +499,7 @@ def build_9box_grid_cells(saved_evaluations_df, manager_employees, levels_df):
         cells[score]["employees"].append(
             {
                 "name": employee_summary["employee_name"] or "Unnamed employee",
-                "role": employee_summary["employee_role"],
+                "job_name": employee_summary["employee_job_name"],
             }
         )
 
@@ -472,7 +517,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             (
                 f"<div class='ninebox-employee'>"
                 f"<div class='ninebox-employee-name'>{html.escape(employee['name'])}</div>"
-                f"<div class='ninebox-employee-role'>{html.escape(employee['role'] or 'Role not provided')}</div>"
+                f"<div class='ninebox-employee-role'>{html.escape(employee['job_name'] or 'Job not provided')}</div>"
                 f"</div>"
             )
             for employee in cell["employees"]
@@ -493,7 +538,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         <style>
         .ninebox-layout {
             display: grid;
-            grid-template-columns: 72px minmax(0, 1fr);
+            grid-template-columns: 96px minmax(0, 1fr);
             gap: 0.75rem;
             align-items: stretch;
             margin: 1rem 0 1.5rem 0;
@@ -501,21 +546,23 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         .ninebox-y-axis {
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            gap: 1rem;
-            color: #4b5563;
-            font-size: 0.9rem;
+            justify-content: space-between;
+            align-items: stretch;
+            gap: 0.5rem;
+            color: var(--text-color, #111827);
+            font-size: 1rem;
+            min-height: 560px;
         }
         .ninebox-y-axis-label {
-            writing-mode: vertical-rl;
-            transform: rotate(180deg);
-            font-weight: 600;
+            font-weight: 700;
             letter-spacing: 0.03em;
+            text-align: left;
         }
-        .ninebox-axis-note {
-            font-size: 0.78rem;
-            color: #6b7280;
+        .ninebox-axis-label-row {
+            color: var(--text-color, #111827);
+            font-size: 1.05rem;
+            font-weight: 700;
+            text-shadow: 0 0 0.01px currentColor;
         }
         .ninebox-main {
             display: flex;
@@ -531,11 +578,11 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         }
         .ninebox-cell {
             min-height: 182px;
-            border: 1px solid #d1d5db;
+            border: 1.5px solid color-mix(in srgb, var(--text-color, #111827) 28%, transparent);
             border-radius: 14px;
             padding: 0.85rem;
-            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+            background: color-mix(in srgb, var(--background-color, #ffffff) 90%, transparent);
+            box-shadow: none;
         }
         .ninebox-cell-header {
             display: flex;
@@ -551,15 +598,16 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             height: 1.7rem;
             padding: 0 0.35rem;
             border-radius: 999px;
-            background: #0f172a;
-            color: #ffffff;
-            font-size: 0.8rem;
+            border: 1.5px solid var(--text-color, #111827);
+            background: transparent;
+            color: var(--text-color, #111827);
+            font-size: 0.82rem;
             font-weight: 700;
         }
         .ninebox-level-name {
             font-size: 0.95rem;
             font-weight: 600;
-            color: #0f172a;
+            color: var(--text-color, #111827);
             line-height: 1.2;
         }
         .ninebox-cell-body {
@@ -569,23 +617,24 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         }
         .ninebox-employee {
             border-radius: 10px;
-            background: #e2e8f0;
+            border: 1px solid color-mix(in srgb, var(--text-color, #111827) 18%, transparent);
+            background: transparent;
             padding: 0.45rem 0.55rem;
         }
         .ninebox-employee-name {
-            color: #111827;
+            color: var(--text-color, #111827);
             font-size: 0.88rem;
             font-weight: 600;
             line-height: 1.2;
         }
         .ninebox-employee-role {
-            color: #475569;
+            color: color-mix(in srgb, var(--text-color, #111827) 76%, transparent);
             font-size: 0.76rem;
             margin-top: 0.15rem;
             line-height: 1.2;
         }
         .ninebox-empty {
-            color: #94a3b8;
+            color: color-mix(in srgb, var(--text-color, #111827) 52%, transparent);
             font-size: 0.8rem;
             font-style: italic;
         }
@@ -593,14 +642,14 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             align-items: center;
-            color: #4b5563;
-            font-size: 0.85rem;
+            color: var(--text-color, #111827);
+            font-size: 1.05rem;
             gap: 0.65rem;
             min-width: 720px;
+            font-weight: 700;
         }
         .ninebox-x-axis-center {
             text-align: center;
-            font-weight: 600;
         }
         .ninebox-x-axis-right {
             text-align: right;
@@ -610,12 +659,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
                 grid-template-columns: 1fr;
             }
             .ninebox-y-axis {
-                flex-direction: row;
-                justify-content: space-between;
-            }
-            .ninebox-y-axis-label {
-                writing-mode: initial;
-                transform: none;
+                min-height: auto;
             }
         }
         </style>
@@ -626,16 +670,16 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         (
             "<div class='ninebox-layout'>"
             "<div class='ninebox-y-axis'>"
-            "<div>High</div>"
+            "<div class='ninebox-axis-label-row'>High</div>"
             "<div class='ninebox-y-axis-label'>Potential &uarr;</div>"
-            "<div>Low</div>"
+            "<div class='ninebox-axis-label-row'>Low</div>"
             "</div>"
             "<div class='ninebox-main'>"
             f"<div class='ninebox-grid'>{''.join(cell_markup)}</div>"
             "<div class='ninebox-x-axis'>"
-            "<div>Low</div>"
+            "<div class='ninebox-axis-label-row'>Low</div>"
             "<div class='ninebox-x-axis-center'>Performance &rarr;</div>"
-            "<div class='ninebox-x-axis-right'>High</div>"
+            "<div class='ninebox-axis-label-row ninebox-x-axis-right'>High</div>"
             "</div>"
             "</div>"
             "</div>"
@@ -785,9 +829,9 @@ def create_response_entry(manager_email, manager_name, employee, answers, commen
     employee_id = get_employee_id(employee)
     employee_name = get_employee_name(employee)
     employee_email = get_employee_email(employee)
-    employee_role = get_employee_role(employee)
     employee_location = get_employee_location(employee)
     employee_department = get_employee_department(employee)
+    employee_job_name = get_employee_job_name(employee)
     return {
         "response_id": str(uuid.uuid4()),
         "created_at": now,
@@ -797,24 +841,12 @@ def create_response_entry(manager_email, manager_name, employee, answers, commen
         "employee_id": employee_id,
         "employee_name": employee_name,
         "employee_email": employee_email,
-        "branch": employee_location,
-        "dept": employee_department,
-        "job_title": employee_role,
-        "executive_email": "",
+        "location": employee_location,
+        "department": employee_department,
+        "job_name": employee_job_name,
         "questions_score": total_points,
-        "number_of_nos": "",
         "responses": json.dumps(answers),
         "comments": comments.strip(),
-        "employee_agree": "",
-        "manager_agree": "",
-        "executive_agree": "",
-        "employee_agree_ts": "",
-        "manager_agree_ts": "",
-        "executive_agree_ts": "",
-        "status": "Submitted",
-        "employee_token": "",
-        "manager_token": "",
-        "executive_token": "",
     }
 
 
@@ -1039,6 +1071,7 @@ with tab_status:
 
         for _, saved_row in mine.iterrows():
             employee_summary = get_saved_employee_summary(saved_row, manager_employees)
+            employee_id = employee_summary["employee_id"]
             employee_name = employee_summary["employee_name"]
             employee_role = employee_summary["employee_role"]
             employee_location = employee_summary["employee_location"]

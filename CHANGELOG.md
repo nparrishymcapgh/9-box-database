@@ -1,7 +1,10 @@
 # Unreleased
 
+- Reduced the Responses sheet schema to the fields used by the manager-only workflow and removed legacy executive, agreement, token, status, and no-count columns.
+- Fixed the submitted-evaluations delete action crash caused by an undefined employee identifier in the expander button key.
+- Restyled the nine-box grid to use theme-aware outlines, higher-contrast axis labels, and employee name plus job name in each cell.
 - Added a 3x3 nine-box grid to Submitted 9 Box Evaluations so managers can see every rated employee plotted by score before the saved-evaluations list.
-- Stopped storing per-response no counts while preserving the legacy Responses sheet column for compatibility.
+- Stopped storing per-response no counts and removed that legacy field from the Responses sheet schema.
 - Added tolerant worksheet loading to handle blank or duplicate Google Sheets headers without crashing startup.
 - Updated the manager evaluation flow to advance to the next pending employee automatically and show a completion message after all assigned employees are reviewed.
 - Expanded submitted evaluation summaries to show employee role, location, and department and moved delete/start-over actions there.
