@@ -533,10 +533,13 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             f"</div>"
         )
 
+    _theme_type = (st.context.theme or {}).get("type", "light") or "light"
+    _cell_bg = "#0e1117" if _theme_type == "dark" else "#ffffff"
+
     st.markdown(
         """
         <style>
-        /* ninebox-style-v5 */
+        /* ninebox-style-v6 */
         .ninebox-layout {
             --ninebox-text: currentColor;
             --ninebox-axis-text: currentColor;
@@ -545,7 +548,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
             --ninebox-soft-border: color-mix(in srgb, var(--ninebox-text) 18%, transparent);
             --ninebox-muted: color-mix(in srgb, var(--ninebox-text) 76%, transparent);
             --ninebox-empty: color-mix(in srgb, var(--ninebox-text) 52%, transparent);
-            --ninebox-cell-bg: var(--background-color, #ffffff);
+            --ninebox-cell-bg: #ffffff;
             color: inherit;
             display: grid;
             grid-template-columns: 92px minmax(0, 1fr);
@@ -686,69 +689,7 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         unsafe_allow_html=True,
     )
     st.markdown(
-        """
-        <script>
-        (function () {
-            /*
-             * Streamlit uses Emotion CSS-in-JS.
-             * Body background stays transparent; dark bg is on .stApp via generated classes.
-             * Most reliable signal: computed TEXT color on .stApp.
-             * In dark mode Streamlit sets light text (luminance > 0.5).
-             * In light mode it sets dark text (luminance < 0.5).
-             */
-
-            if (window.__nineboxIntervalId) {
-                clearInterval(window.__nineboxIntervalId);
-            }
-
-            function getLuminance(rgbString) {
-                var m = (rgbString || '').match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
-                if (!m) { return 0; }
-                return (0.299 * +m[1] + 0.587 * +m[2] + 0.114 * +m[3]) / 255;
-            }
-
-            function getAppTextColor() {
-                var candidates = [
-                    document.querySelector('.stApp'),
-                    document.querySelector('[data-testid="stAppViewContainer"]'),
-                    document.querySelector('[data-testid="stMainBlockContainer"]'),
-                    document.body
-                ];
-                for (var i = 0; i < candidates.length; i++) {
-                    var el = candidates[i];
-                    if (!el) { continue; }
-                    var c = window.getComputedStyle(el).color || '';
-                    if (c && c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent') {
-                        return c;
-                    }
-                }
-                return 'rgb(0,0,0)';
-            }
-
-            var _lastTextColor = null;
-
-            function applyTheme() {
-                var textColor = getAppTextColor();
-                if (textColor === _lastTextColor) { return; }
-                _lastTextColor = textColor;
-
-                /* Light text → dark mode; dark text → light mode */
-                var isDark = getLuminance(textColor) > 0.5;
-                var cellBg = isDark ? '#000000' : '#ffffff';
-
-                document.querySelectorAll('.ninebox-layout').forEach(function (layout) {
-                    layout.style.setProperty('--ninebox-cell-bg', cellBg);
-                    layout.querySelectorAll('.ninebox-cell').forEach(function (cell) {
-                        cell.style.setProperty('background-color', cellBg, 'important');
-                    });
-                });
-            }
-
-            applyTheme();
-            window.__nineboxIntervalId = setInterval(applyTheme, 400);
-        })();
-        </script>
-        """,
+        f"<style>.ninebox-layout{{--ninebox-cell-bg:{_cell_bg}}}.ninebox-cell{{background:{_cell_bg}!important}}</style>",
         unsafe_allow_html=True,
     )
     st.markdown(
