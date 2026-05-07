@@ -539,11 +539,13 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
         .ninebox-layout {
             --ninebox-text: var(--text-color, #111827);
             --ninebox-axis-text: var(--text-color, #111827);
+            --ninebox-bg: var(--background-color, #ffffff);
             --ninebox-border: color-mix(in srgb, var(--ninebox-text) 28%, transparent);
             --ninebox-soft-border: color-mix(in srgb, var(--ninebox-text) 18%, transparent);
             --ninebox-muted: color-mix(in srgb, var(--ninebox-text) 76%, transparent);
             --ninebox-empty: color-mix(in srgb, var(--ninebox-text) 52%, transparent);
-            --ninebox-cell-bg: var(--background-color, #ffffff);
+            --ninebox-cell-bg: color-mix(in srgb, var(--ninebox-bg) 94%, var(--ninebox-text) 6%);
+            color: var(--ninebox-text);
             display: grid;
             grid-template-columns: 92px minmax(0, 1fr);
             gap: 0;
@@ -693,27 +695,6 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
                 return;
             }
 
-            function parseRgb(colorValue) {
-                var match = (colorValue || "").match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/i);
-                if (!match) {
-                    return null;
-                }
-                return {
-                    r: Number(match[1]),
-                    g: Number(match[2]),
-                    b: Number(match[3])
-                };
-            }
-
-            function isDarkColor(colorValue) {
-                var rgb = parseRgb(colorValue);
-                if (!rgb) {
-                    return false;
-                }
-                var luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
-                return luminance < 0.5;
-            }
-
             function getCssVar(element, name) {
                 if (!element) {
                     return '';
@@ -735,22 +716,6 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
                 return '#ffffff';
             }
 
-            function detectDarkMode(appRoot) {
-                var html = document.documentElement;
-                var body = document.body;
-                var rootTheme = (html && html.getAttribute('data-theme') || '').toLowerCase();
-                var appTheme = (appRoot && appRoot.getAttribute('data-theme') || '').toLowerCase();
-                var classText = ((html && html.className) || '') + ' ' + ((body && body.className) || '') + ' ' + ((appRoot && appRoot.className) || '');
-                var classLooksDark = /(^|\s)(dark|theme-dark|st-dark)(\s|$)/i.test(classText);
-
-                if (rootTheme === 'dark' || appTheme === 'dark' || classLooksDark) {
-                    return true;
-                }
-
-                var bg = firstSolidBackground([appRoot, body, html]);
-                return isDarkColor(bg);
-            }
-
             function getThemeTextColor(appRoot) {
                 var html = document.documentElement;
                 var body = document.body;
@@ -761,6 +726,16 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
                 return window.getComputedStyle(appRoot || body || html).color || '#111827';
             }
 
+            function getThemeBackgroundColor(appRoot) {
+                var html = document.documentElement;
+                var body = document.body;
+                var cssVar = getCssVar(appRoot, '--background-color') || getCssVar(html, '--background-color') || getCssVar(body, '--background-color');
+                if (cssVar) {
+                    return cssVar;
+                }
+                return firstSolidBackground([appRoot, body, html]);
+            }
+
             function applyTheme() {
                 var appRoot = document.querySelector('.stApp') || document.body;
                 var layouts = document.querySelectorAll('.ninebox-layout');
@@ -769,17 +744,12 @@ def render_9box_grid(saved_evaluations_df, manager_employees, levels_df):
                 }
 
                 var appText = getThemeTextColor(appRoot);
-                var dark = detectDarkMode(appRoot);
+                var appBackground = getThemeBackgroundColor(appRoot);
 
                 layouts.forEach(function (layout) {
-                    var axisText = dark ? '#ffffff' : '#111827';
-                    var axisLabels = layout.querySelectorAll('.ninebox-axis-text');
                     layout.style.setProperty('--ninebox-text', appText);
-                    layout.style.setProperty('--ninebox-axis-text', axisText);
-                    layout.style.setProperty('--ninebox-cell-bg', dark ? '#000000' : '#ffffff');
-                    axisLabels.forEach(function (label) {
-                        label.style.setProperty('color', axisText, 'important');
-                    });
+                    layout.style.setProperty('--ninebox-axis-text', appText);
+                    layout.style.setProperty('--ninebox-bg', appBackground);
                 });
             }
 
